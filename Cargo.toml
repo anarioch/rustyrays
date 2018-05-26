@@ -1,0 +1,6 @@
+[package]
+name = "raytrace"
+version = "0.1.0"
+authors = ["Jerome Dolman <jerome@novapsi.net.nz>"]
+
+[dependencies]
