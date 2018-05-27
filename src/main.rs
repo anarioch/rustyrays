@@ -35,8 +35,11 @@ fn main() {
 }
 
 fn colour(ray: &Ray) -> Vec3 {
-    if math::hit_sphere(&Vec3::new(0.0, 0.0, -1.0), 0.5, &ray) {
-        Vec3::new(1.0, 0.0, 0.0)
+    let sphere_centre = Vec3::new(0.0, 0.0, -1.0);
+    let sphere_hit = math::hit_sphere(&sphere_centre, 0.5, &ray);
+    if sphere_hit >= 0.0 {
+        let N = ray.at_t(sphere_hit).sub(&sphere_centre).normalise();
+        Vec3::new(N.x + 1.0, N.y + 1.0, N.z + 1.0).mul(0.5)
     }
     else {
         let unit = ray.direction.normalise();
