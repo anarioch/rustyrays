@@ -50,7 +50,7 @@ pub fn hit(ray: &Ray, t_min: f32, t_max: f32, objects: &Vec<Box<Hitable>>) -> Hi
     let mut result = HitResult::Miss;
     let mut closest_so_far = t_max;
     for obj in objects {
-        match (*obj).hit(&ray, 0.0, closest_so_far) {
+        match (*obj).hit(&ray, t_min, closest_so_far) {
             HitResult::Hit { t, p, normal } => {
                 closest_so_far = t;
                 result = HitResult::Hit { t, p, normal };

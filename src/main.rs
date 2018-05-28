@@ -17,7 +17,7 @@ use raytrace::geometry::HitResult::{Hit,Miss};
 fn main() {
     const COLS: usize = 500;
     const ROWS: usize = 300;
-    const NUM_SAMPLES: usize = 100;
+    const NUM_SAMPLES: usize = 100; // Sample code recommends 100 but it is too slow
 
     println!("Hello, world!");
 
@@ -39,6 +39,7 @@ fn main() {
                 colour = colour.add(&ray_colour(&ray, &objects));
             }
             let colour = colour.mul(1.0 / NUM_SAMPLES as f32);
+            let colour = Vec3::new(colour.x.sqrt(), colour.y.sqrt(), colour.z.sqrt());
             image.append_pixel(&colour);
         }
     }
@@ -48,11 +49,23 @@ fn main() {
     write_text_to_file(&image.get_text(), &path);
 }
 
+fn random_in_unit_sphere() -> Vec3 {
+    let unit = Vec3::new(1.0, 1.0, 1.0);
+    let mut p = Vec3::new(2.0, 2.0, 2.0);
+    let mut rng = rand::thread_rng();
+    while p.len_sq() >= 1.0 {
+        p = Vec3::new(rng.gen::<f32>(), rng.gen::<f32>(), rng.gen::<f32>()).mul(2.0).sub(&unit);
+    }
+    p
+}
+
 fn ray_colour(ray: &Ray, objects: &Vec<Box<Hitable>>) -> Vec3 {
-    match geometry::hit(&ray, 0.0, 1000.0, &objects) {
-        Hit { t: _, p: _, normal } => {
-            let normal = normal.normalise();
-            Vec3::new(normal.x + 1.0, normal.y + 1.0, normal.z + 1.0).mul(0.5)
+    match geometry::hit(&ray, 0.001, 1000.0, &objects) {
+        Hit { t: _, p, normal } => {
+            // normal.normalise().add(&Vec3::new(1.0, 1.0, 1.0)).mul(0.5) // Use this return value to visualise normals
+            let target = p.add(&normal).add(&random_in_unit_sphere());
+            let dir = target.sub(&p);
+            ray_colour(&Ray { origin: p, direction: dir }, &objects).mul(0.5)
         },
         Miss => {
             let unit = ray.direction.normalise();
