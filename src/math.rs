@@ -1,3 +1,5 @@
+
+#[derive(PartialEq,Debug)]
 pub struct Vec3 {
     pub x: f32,
     pub y: f32,
@@ -83,7 +85,38 @@ mod tests {
     use super::SphereHitResult::{Hit,Miss};
 
     #[test]
-    fn normalise() {
+    fn vec3_add() {
+        let v1 = Vec3::new(1.0, 2.0, 3.0);
+        let v2 = Vec3::new(-1.0, 5.0, 0.0);
+
+        assert_eq!(v1.add(&v2), Vec3::new(0.0, 7.0, 3.0));
+    }
+
+    #[test]
+    fn vec3_sub() {
+        let v1 = Vec3::new(1.0, 2.0, 3.0);
+        let v2 = Vec3::new(-1.0, 5.0, 0.0);
+
+        assert_eq!(v1.sub(&v2), Vec3::new(2.0, -3.0, 3.0));
+    }
+
+    #[test]
+    fn vec3_len_sq() {
+        assert_eq!(Vec3::new(0.0, 0.0, 0.0).len_sq(), 0.0);
+        assert_eq!(Vec3::new(0.0, 1.0, 0.0).len_sq(), 1.0);
+        assert_eq!(Vec3::new(0.0, 5.0, 0.0).len_sq(), 25.0);
+        assert_eq!(Vec3::new(1.0, 1.0, 1.0).len_sq(), 3.0);
+    }
+
+    #[test]
+    fn vec3_mul() {
+        let v1 = Vec3::new(1.0, 2.0, -3.0);
+
+        assert_eq!(v1.mul(3.0), Vec3::new(3.0, 6.0, -9.0));
+    }
+
+    #[test]
+    fn vec3_normalise() {
         // Normalise an already normalised vector
         let up = Vec3::new(0.0, 1.0, 0.0);
         let normalised = up.normalise();
@@ -113,7 +146,7 @@ mod tests {
         // Expected miss: ray parallel to y axis and sphere 2 units down y axis
         match hit_sphere(&Vec3::new(0.0, -2.0, 0.0), 1.0, &down_y_parallel) {
             Miss => (),
-            Hit{t} => panic!("This ray and sphere were supposed to miss"),
+            Hit { t: _ } => panic!("This ray and sphere were supposed to miss"),
         };
         // assert_eq!(hit_sphere(&origin, 1.0, &down_z_parallel), SphereHitResult::Miss);
     }
