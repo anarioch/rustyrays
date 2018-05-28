@@ -54,18 +54,24 @@ impl Ray {
     }
 }
 
+pub enum SphereHitResult {
+    Miss,
+    Hit { t: f32 },
+}
+
 // TODO: Return an enum to be more Rust-like
-pub fn hit_sphere(centre: &Vec3, radius: f32, ray: &Ray) -> f32 {
+pub fn hit_sphere(centre: &Vec3, radius: f32, ray: &Ray) -> SphereHitResult {
     let oc = ray.origin.sub(&centre);
     let a = ray.direction.len_sq();
     let b = 2.0 * oc.dot(&ray.direction);
     let c = oc.len_sq() - radius * radius;
     let discriminant = b * b - 4.0 * a * c;
     if discriminant < 0.0 {
-        -1.0
+        SphereHitResult::Miss
     }
     else {
-        (-b - discriminant.sqrt()) / (2.0 * a)
+        let t = (-b - discriminant.sqrt()) / (2.0 * a);
+        SphereHitResult::Hit { t }
     }
 }
 
@@ -74,6 +80,7 @@ mod tests {
     use super::Vec3;
     use super::Ray;
     use super::hit_sphere;
+    use super::SphereHitResult::{Hit,Miss};
 
     #[test]
     fn normalise() {
@@ -96,9 +103,18 @@ mod tests {
     fn hit_sphere_works() {
         let origin = Vec3::new(0.0, 0.0, 0.0);
         let left = Vec3::new(-1.0, 0.0, 0.0);
-        let down_z = Ray { origin: origin.clone(), direction: Vec3::new(0.0, -1.0, 0.0) };
-        let down_z_parallel = Ray { origin: left.mul(2.0), direction: Vec3::new(0.0, -1.0, 0.0) };
-        assert_eq!(hit_sphere(&origin, 1.0, &down_z) != 1.0, true);
-        assert_eq!(hit_sphere(&origin, 1.0, &down_z_parallel) >= 0.0, false);
+        let down_y = Ray { origin: origin.clone(), direction: Vec3::new(0.0, -1.0, 0.0) };
+        let down_y_parallel = Ray { origin: left.mul(2.0), direction: Vec3::new(0.0, -1.0, 0.0) };
+        // Expected hit: ray along y axis and sphere 2 units down y axis
+        match hit_sphere(&Vec3::new(0.0, -2.0, 0.0), 1.0, &down_y) {
+            Miss => panic!("This ray and sphere were supposed to hit"),
+            Hit{t} => assert_eq!(t, 1.0),
+        };
+        // Expected miss: ray parallel to y axis and sphere 2 units down y axis
+        match hit_sphere(&Vec3::new(0.0, -2.0, 0.0), 1.0, &down_y_parallel) {
+            Miss => (),
+            Hit{t} => panic!("This ray and sphere were supposed to miss"),
+        };
+        // assert_eq!(hit_sphere(&origin, 1.0, &down_z_parallel), SphereHitResult::Miss);
     }
 }

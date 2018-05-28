@@ -7,6 +7,7 @@ use std::path::Path;
 
 use raytrace::math;
 use raytrace::math::{Vec3,Ray};
+use raytrace::math::SphereHitResult::{Hit,Miss};
 use raytrace::ppm::PpmImage;
 
 fn main() {
@@ -36,17 +37,18 @@ fn main() {
 
 fn colour(ray: &Ray) -> Vec3 {
     let sphere_centre = Vec3::new(0.0, 0.0, -1.0);
-    let sphere_hit = math::hit_sphere(&sphere_centre, 0.5, &ray);
-    if sphere_hit >= 0.0 {
-        let N = ray.at_t(sphere_hit).sub(&sphere_centre).normalise();
-        Vec3::new(N.x + 1.0, N.y + 1.0, N.z + 1.0).mul(0.5)
-    }
-    else {
-        let unit = ray.direction.normalise();
-        let t = 0.5 * (unit.y + 1.0);
-        let blue = Vec3::new(0.5, 0.7, 1.0);
-        let white = Vec3::new(1.0, 1.0, 1.0);
-        white.mul(1.0 - t).add(&blue.mul(t))
+    match math::hit_sphere(&sphere_centre, 0.5, &ray) {
+        Hit { t } => {
+            let normal = ray.at_t(t).sub(&sphere_centre).normalise();
+            Vec3::new(normal.x + 1.0, normal.y + 1.0, normal.z + 1.0).mul(0.5)
+        },
+        Miss => {
+            let unit = ray.direction.normalise();
+            let t = 0.5 * (unit.y + 1.0);
+            let blue = Vec3::new(0.5, 0.7, 1.0);
+            let white = Vec3::new(1.0, 1.0, 1.0);
+            white.mul(1.0 - t).add(&blue.mul(t))
+        }
     }
     // let colour = if ray.direction.y > 0.0 {
     //     Vec3::new(0.5, 0.7, 0.95)
