@@ -1,24 +1,35 @@
 
 use super::math::{Vec3,Ray};
 
-pub struct HitRecord {
+pub struct HitRecord<'a> {
     pub t: f32,
     pub p: Vec3,
-    pub normal: Vec3
+    pub normal: Vec3,
+    pub material: &'a Material,
 }
 
-pub enum HitResult {
+pub enum HitResult<'a> {
     Miss,
-    Hit(HitRecord),
+    Hit(HitRecord<'a>),
 }
 
 pub trait Hitable {
-    fn hit(&self, ray: &Ray, t_min: f32, t_max: f32) -> HitResult;
+    fn hit<'a>(&'a self, ray: &Ray, t_min: f32, t_max: f32) -> HitResult<'a>;
+}
+
+pub struct ScatterResult {
+    pub attenuation: Vec3,
+    pub scattered: Ray,
+}
+
+pub trait Material {
+    fn scatter(&self, ray: &Ray, hit: &HitRecord) -> Option<ScatterResult>;
 }
 
 pub struct Sphere {
     pub centre: Vec3,
     pub radius: f32,
+    pub material: Box<Material>,
 }
 
 impl Hitable for Sphere {
@@ -38,12 +49,12 @@ impl Hitable for Sphere {
             if t1 < t_max && t1 > t_min {
                 let p = ray.at_t(t1);
                 let normal = p.sub(&self.centre).mul(1.0/self.radius);
-                HitResult::Hit(HitRecord { t: t1, p, normal })
+                HitResult::Hit(HitRecord { t: t1, p, normal, material: &*self.material })
             }
             else if t2 < t_max && t2 > t_min {
                 let p = ray.at_t(t2);
                 let normal = p.sub(&self.centre).mul(1.0/self.radius);
-                HitResult::Hit(HitRecord { t: t2, p, normal })
+                HitResult::Hit(HitRecord { t: t2, p, normal, material: &*self.material })
             }
             else {
                 HitResult::Miss
@@ -52,7 +63,7 @@ impl Hitable for Sphere {
     }
 }
 
-pub fn hit(ray: &Ray, t_min: f32, t_max: f32, objects: &Vec<Box<Hitable>>) -> HitResult {
+pub fn hit<'a>(ray: &Ray, t_min: f32, t_max: f32, objects: &'a Vec<Box<Hitable>>) -> HitResult<'a> {
     let mut result = HitResult::Miss;
     let mut closest_so_far = t_max;
     for obj in objects {

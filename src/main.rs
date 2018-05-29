@@ -24,7 +24,7 @@ struct Camera {
 impl Camera {
     fn new(aspect_ratio: f32) -> Camera {
         Camera {
-            lower_left: Vec3::new(-1.0 * aspect_ratio, -1.0, -1.0),
+            lower_left: Vec3::new(-1.0 * aspect_ratio, -1.0, -2.0),
             horizontal: Vec3::new(2.0 * aspect_ratio, 0.0, 0.0),
             vertical: Vec3::new(0.0, 2.0, 0.0),
             origin: Vec3::new(0.0, 0.0, 0.0)
@@ -43,9 +43,13 @@ fn main() {
     println!("Hello, world!");
 
     let camera = Camera::new(COLS as f32 / ROWS as f32);
+    let reddish = Box::new(Lambertian { albedo: Vec3::new(0.7, 0.2, 0.3) });
+    let greenish = Box::new(Lambertian { albedo: Vec3::new(0.1, 0.8, 0.3) });
+    let metallic = Box::new(Metal { albedo: Vec3::new(0.8, 0.6, 0.2) });
     let mut objects : Vec<Box<Hitable>> = Vec::new();
-    objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 0.0, -1.0), radius: 0.5 }));
-    objects.push(Box::new(Sphere { centre: Vec3::new(0.0, -100.5, -1.0), radius: 100.0 }));
+    objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 0.0, -2.0), radius: 0.5, material: reddish }));
+    objects.push(Box::new(Sphere { centre: Vec3::new(0.0, -100.5, -2.0), radius: 100.0, material: greenish }));
+    objects.push(Box::new(Sphere { centre: Vec3::new(1.0, 0.0, -2.0), radius: 0.5, material: metallic }));
 
     let mut image = PpmImage::create(COLS, ROWS);
     let mut rng = rand::thread_rng();
@@ -59,7 +63,7 @@ fn main() {
                 let u = (pu + rng.gen::<f32>()) / COLS as f32;
                 let v = (pv + rng.gen::<f32>()) / ROWS as f32;
                 let ray = camera.clip_to_ray(u, v);
-                colour.add_eq(&ray_colour(&ray, &objects));
+                colour.add_eq(&ray_colour(&ray, &objects, 0));
             }
             colour.mul_eq(1.0 / NUM_SAMPLES as f32);
             // Gamma correction: sqrt the colour
@@ -86,13 +90,55 @@ fn random_in_unit_sphere() -> Vec3 {
     p
 }
 
-fn ray_colour(ray: &Ray, objects: &Vec<Box<Hitable>>) -> Vec3 {
+struct Lambertian {
+    albedo: Vec3,
+}
+
+impl Material for Lambertian {
+    fn scatter(&self, _ray: &Ray, hit: &HitRecord) -> Option<ScatterResult> {
+        let target = hit.p.add(&hit.normal).add(&random_in_unit_sphere());
+        let dir = target.sub(&hit.p);
+        let scattered = Ray { origin: hit.p.clone(), direction: dir };
+        Some(ScatterResult { attenuation: self.albedo.clone(), scattered})
+    }
+}
+
+struct Metal {
+    albedo: Vec3,
+}
+
+fn reflect(v: &Vec3, n: &Vec3) -> Vec3 {
+    // v - 2*dot(v,n)*n
+    v.sub(&n.mul(2.0 * v.dot(&n)))
+}
+
+impl Material for Metal {
+    fn scatter(&self, ray: &Ray, hit: &HitRecord) -> Option<ScatterResult> {
+        let reflected = reflect(&ray.direction.normalise(), &hit.normal);
+        if reflected.dot(&hit.normal) > 0.0 {
+            let scattered = Ray { origin: hit.p.clone(), direction: reflected };
+            Some(ScatterResult { attenuation: self.albedo.clone(), scattered})
+        }
+        else {
+            None
+        }
+    }
+}
+
+fn ray_colour(ray: &Ray, objects: &Vec<Box<Hitable>>, depth: u32) -> Vec3 {
     match geometry::hit(&ray, 0.001, 1000.0, &objects) {
         Hit(record) => {
             // normal.normalise().add(&Vec3::new(1.0, 1.0, 1.0)).mul(0.5) // Use this return value to visualise normals
-            let target = record.p.add(&record.normal).add(&random_in_unit_sphere());
-            let dir = target.sub(&record.p);
-            ray_colour(&Ray { origin: record.p, direction: dir }, &objects).mul(0.5)
+            if depth >= 50 {
+                return Vec3::new(0.0, 0.0, 0.0);
+            }
+            match record.material.scatter(&ray, &record) {
+                Some(scatter) => {
+                    let recurse = ray_colour(&scatter.scattered, &objects, depth + 1);
+                    scatter.attenuation.mul_vec(&recurse)
+                },
+                None => Vec3::new(0.0, 0.0, 0.0)
+            }
         },
         Miss => {
             let unit = ray.direction.normalise();

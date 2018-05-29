@@ -35,6 +35,10 @@ impl Vec3 {
         Vec3 { x: self.x - other.x, y: self.y - other.y, z: self.z - other.z }
     }
 
+    pub fn mul_vec(&self, other: &Vec3) -> Vec3 {
+        Vec3 { x: self.x * other.x, y: self.y * other.y, z: self.z * other.z }
+    }
+
     pub fn mul(&self, scale: f32) -> Vec3 {
         Vec3 { x: self.x * scale, y: self.y * scale, z: self.z * scale }
     }
