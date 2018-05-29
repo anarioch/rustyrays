@@ -14,32 +14,57 @@ use raytrace::geometry;
 use raytrace::geometry::*;
 use raytrace::geometry::HitResult::{Hit,Miss};
 
+struct Camera {
+    lower_left : Vec3,
+    horizontal : Vec3,
+    vertical : Vec3,
+    origin : Vec3,
+}
+
+impl Camera {
+    fn new(aspect_ratio: f32) -> Camera {
+        Camera {
+            lower_left: Vec3::new(-1.0 * aspect_ratio, -1.0, -1.0),
+            horizontal: Vec3::new(2.0 * aspect_ratio, 0.0, 0.0),
+            vertical: Vec3::new(0.0, 2.0, 0.0),
+            origin: Vec3::new(0.0, 0.0, 0.0)
+        }
+    }
+    fn clip_to_ray(&self, u: f32, v: f32) -> Ray {
+        Ray::new(&self.origin, &self.lower_left.add(&self.horizontal.mul(u)).add(&self.vertical.mul(v)))
+    }
+}
+
 fn main() {
-    const COLS: usize = 500;
-    const ROWS: usize = 300;
-    const NUM_SAMPLES: usize = 100; // Sample code recommends 100 but it is too slow
+    const COLS: usize = 400;
+    const ROWS: usize = 200;
+    const NUM_SAMPLES: usize = 20; // Sample code recommends 100 but this is slow
 
     println!("Hello, world!");
 
-    let mut image = PpmImage::create(COLS, ROWS);
+    let camera = Camera::new(COLS as f32 / ROWS as f32);
     let mut objects : Vec<Box<Hitable>> = Vec::new();
     objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 0.0, -1.0), radius: 0.5 }));
     objects.push(Box::new(Sphere { centre: Vec3::new(0.0, -100.5, -1.0), radius: 100.0 }));
-    let origin = Vec3::new(0.0, 0.0, 0.0);
+
+    let mut image = PpmImage::create(COLS, ROWS);
     let mut rng = rand::thread_rng();
-    for r in 0..ROWS {
+    for r in (0..ROWS).rev() {
+        let pv = r as f32;
         for c in 0..COLS {
+            let pu = c as f32;
+            // Anti-aliased: average colour from multiple randomised samples per pixel
             let mut colour = Vec3::new(0.0, 0.0, 0.0);
             for _s in 0..NUM_SAMPLES {
-                let y = ((ROWS-r-1) as f32 + rng.gen::<f32>()) / ROWS as f32;
-                let y = 2.0 * y - 1.0;
-                let x = (c as f32 + rand::random::<f32>()) / ROWS as f32;
-                let x = 2.0 * x - (COLS as f32 / ROWS as f32);
-                let ray = Ray::new(&origin, &Vec3::new(x, y, -1.0));
+                let u = (pu + rng.gen::<f32>()) / COLS as f32;
+                let v = (pv + rng.gen::<f32>()) / ROWS as f32;
+                let ray = camera.clip_to_ray(u, v);
                 colour = colour.add(&ray_colour(&ray, &objects));
             }
             let colour = colour.mul(1.0 / NUM_SAMPLES as f32);
+            // Gamma correction: sqrt the colour
             let colour = Vec3::new(colour.x.sqrt(), colour.y.sqrt(), colour.z.sqrt());
+            // Output the colour for this pixel
             image.append_pixel(&colour);
         }
     }
