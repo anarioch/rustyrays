@@ -38,18 +38,20 @@ impl Camera {
 fn main() {
     const COLS: usize = 400;
     const ROWS: usize = 200;
-    const NUM_SAMPLES: usize = 20; // Sample code recommends 100 but this is slow
+    const NUM_SAMPLES: usize = 100; // Sample code recommends 100 but this is slow
 
     println!("Hello, world!");
 
     let camera = Camera::new(COLS as f32 / ROWS as f32);
     let reddish = Box::new(Lambertian { albedo: Vec3::new(0.7, 0.2, 0.3) });
     let greenish = Box::new(Lambertian { albedo: Vec3::new(0.1, 0.8, 0.3) });
-    let metallic = Box::new(Metal { albedo: Vec3::new(0.8, 0.6, 0.2) });
+    let brushed_gold = Box::new(Metal { albedo: Vec3::new(0.8, 0.6, 0.2), fuzz: 0.3 });
+    let silver = Box::new(Metal { albedo: Vec3::new(0.8, 0.8, 0.8), fuzz: 0.05 });
     let mut objects : Vec<Box<Hitable>> = Vec::new();
     objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 0.0, -2.0), radius: 0.5, material: reddish }));
     objects.push(Box::new(Sphere { centre: Vec3::new(0.0, -100.5, -2.0), radius: 100.0, material: greenish }));
-    objects.push(Box::new(Sphere { centre: Vec3::new(1.0, 0.0, -2.0), radius: 0.5, material: metallic }));
+    objects.push(Box::new(Sphere { centre: Vec3::new(1.0, 0.0, -2.0), radius: 0.5, material: brushed_gold }));
+    objects.push(Box::new(Sphere { centre: Vec3::new(-1.0, 0.0, -2.0), radius: 0.5, material: silver }));
 
     let mut image = PpmImage::create(COLS, ROWS);
     let mut rng = rand::thread_rng();
@@ -105,6 +107,7 @@ impl Material for Lambertian {
 
 struct Metal {
     albedo: Vec3,
+    fuzz: f32,
 }
 
 fn reflect(v: &Vec3, n: &Vec3) -> Vec3 {
@@ -115,6 +118,7 @@ fn reflect(v: &Vec3, n: &Vec3) -> Vec3 {
 impl Material for Metal {
     fn scatter(&self, ray: &Ray, hit: &HitRecord) -> Option<ScatterResult> {
         let reflected = reflect(&ray.direction.normalise(), &hit.normal);
+        let reflected = reflected.add(&random_in_unit_sphere().mul(self.fuzz));
         if reflected.dot(&hit.normal) > 0.0 {
             let scattered = Ray { origin: hit.p.clone(), direction: reflected };
             Some(ScatterResult { attenuation: self.albedo.clone(), scattered})
