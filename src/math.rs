@@ -15,6 +15,12 @@ impl Vec3 {
         Vec3 { x: self.x, y: self.y, z: self.z }
     }
 
+    pub fn set(&mut self, x: f32, y: f32, z: f32) {
+        self.x = x;
+        self.y = y;
+        self.z = z;
+    }
+
     pub fn normalise(&self) -> Vec3 {
         let length = self.dot(&self).sqrt();
         self.mul(1.0 / length)
@@ -31,6 +37,24 @@ impl Vec3 {
 
     pub fn mul(&self, scale: f32) -> Vec3 {
         Vec3 { x: self.x * scale, y: self.y * scale, z: self.z * scale }
+    }
+
+    pub fn add_eq(&mut self, other: &Vec3) {
+        self.x += other.x;
+        self.y += other.y;
+        self.z += other.z;
+    }
+
+    pub fn sub_eq(&mut self, other: &Vec3) {
+        self.x -= other.x;
+        self.y -= other.y;
+        self.z -= other.z;
+    }
+
+    pub fn mul_eq(&mut self, scale: f32) {
+        self.x *= scale;
+        self.y *= scale;
+        self.z *= scale;
     }
 
     pub fn dot(&self, other: &Vec3) -> f32 {

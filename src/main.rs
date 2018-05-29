@@ -59,9 +59,9 @@ fn main() {
                 let u = (pu + rng.gen::<f32>()) / COLS as f32;
                 let v = (pv + rng.gen::<f32>()) / ROWS as f32;
                 let ray = camera.clip_to_ray(u, v);
-                colour = colour.add(&ray_colour(&ray, &objects));
+                colour.add_eq(&ray_colour(&ray, &objects));
             }
-            let colour = colour.mul(1.0 / NUM_SAMPLES as f32);
+            colour.mul_eq(1.0 / NUM_SAMPLES as f32);
             // Gamma correction: sqrt the colour
             let colour = Vec3::new(colour.x.sqrt(), colour.y.sqrt(), colour.z.sqrt());
             // Output the colour for this pixel
@@ -79,7 +79,9 @@ fn random_in_unit_sphere() -> Vec3 {
     let mut p = Vec3::new(2.0, 2.0, 2.0);
     let mut rng = rand::thread_rng();
     while p.len_sq() >= 1.0 {
-        p = Vec3::new(rng.gen::<f32>(), rng.gen::<f32>(), rng.gen::<f32>()).mul(2.0).sub(&unit);
+        p.set(rng.gen::<f32>(), rng.gen::<f32>(), rng.gen::<f32>());
+        p.mul_eq(2.0);
+        p.sub_eq(&unit);
     }
     p
 }
