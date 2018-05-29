@@ -88,11 +88,11 @@ fn random_in_unit_sphere() -> Vec3 {
 
 fn ray_colour(ray: &Ray, objects: &Vec<Box<Hitable>>) -> Vec3 {
     match geometry::hit(&ray, 0.001, 1000.0, &objects) {
-        Hit { t: _, p, normal } => {
+        Hit(record) => {
             // normal.normalise().add(&Vec3::new(1.0, 1.0, 1.0)).mul(0.5) // Use this return value to visualise normals
-            let target = p.add(&normal).add(&random_in_unit_sphere());
-            let dir = target.sub(&p);
-            ray_colour(&Ray { origin: p, direction: dir }, &objects).mul(0.5)
+            let target = record.p.add(&record.normal).add(&random_in_unit_sphere());
+            let dir = target.sub(&record.p);
+            ray_colour(&Ray { origin: record.p, direction: dir }, &objects).mul(0.5)
         },
         Miss => {
             let unit = ray.direction.normalise();

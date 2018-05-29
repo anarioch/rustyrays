@@ -1,9 +1,15 @@
 
 use super::math::{Vec3,Ray};
 
+pub struct HitRecord {
+    pub t: f32,
+    pub p: Vec3,
+    pub normal: Vec3
+}
+
 pub enum HitResult {
     Miss,
-    Hit { t: f32, p: Vec3, normal: Vec3 },
+    Hit(HitRecord),
 }
 
 pub trait Hitable {
@@ -32,12 +38,12 @@ impl Hitable for Sphere {
             if t1 < t_max && t1 > t_min {
                 let p = ray.at_t(t1);
                 let normal = p.sub(&self.centre).mul(1.0/self.radius);
-                HitResult::Hit { t: t1, p, normal }
+                HitResult::Hit(HitRecord { t: t1, p, normal })
             }
             else if t2 < t_max && t2 > t_min {
                 let p = ray.at_t(t2);
                 let normal = p.sub(&self.centre).mul(1.0/self.radius);
-                HitResult::Hit { t: t2, p, normal }
+                HitResult::Hit(HitRecord { t: t2, p, normal })
             }
             else {
                 HitResult::Miss
@@ -51,9 +57,9 @@ pub fn hit(ray: &Ray, t_min: f32, t_max: f32, objects: &Vec<Box<Hitable>>) -> Hi
     let mut closest_so_far = t_max;
     for obj in objects {
         match (*obj).hit(&ray, t_min, closest_so_far) {
-            HitResult::Hit { t, p, normal } => {
-                closest_so_far = t;
-                result = HitResult::Hit { t, p, normal };
+            HitResult::Hit(record) => {
+                closest_so_far = record.t;
+                result = HitResult::Hit(record);
             },
             HitResult::Miss => {
             }
@@ -79,12 +85,12 @@ mod tests {
         let sphere = Sphere { centre: Vec3::new(0.0, -2.0, 0.0), radius: 1.0 };
         match sphere.hit(&down_y, 0.0, 1000.0) {
             Miss => panic!("This ray and sphere were supposed to hit"),
-            Hit{ t, p: _, normal: _ } => assert_eq!(t, 1.0),
+            Hit(record) => assert_eq!(record.t, 1.0),
         };
         // Expected miss: ray parallel to y axis and sphere 2 units down y axis
         match sphere.hit(&down_y_parallel, 0.0, 1000.0) {
             Miss => (),
-            Hit { t: _, p: _, normal: _ } => panic!("This ray and sphere were supposed to miss"),
+            Hit(_) => panic!("This ray and sphere were supposed to miss"),
         };
         // assert_eq!(hit_sphere(&origin, 1.0, &down_z_parallel), SphereHitResult::Miss);
     }
