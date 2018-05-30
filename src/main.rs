@@ -23,11 +23,14 @@ struct Camera {
 }
 
 impl Camera {
-    fn new(aspect_ratio: f32) -> Camera {
+    fn new(vfov: f32, aspect_ratio: f32) -> Camera {
+        let theta = vfov * std::f32::consts::PI / 180.0;
+        let half_height = (0.5 * theta).tan();
+        let half_width = aspect_ratio * half_height;
         Camera {
-            lower_left: Vec3::new(-1.0 * aspect_ratio, -1.0, -2.0),
-            horizontal: Vec3::new(2.0 * aspect_ratio, 0.0, 0.0),
-            vertical: Vec3::new(0.0, 2.0, 0.0),
+            lower_left: Vec3::new(-half_width, -half_height, -2.0),
+            horizontal: Vec3::new(2.0 * half_width, 0.0, 0.0),
+            vertical: Vec3::new(0.0, 2.0 * half_height, 0.0),
             origin: Vec3::new(0.0, 0.0, 0.0)
         }
     }
@@ -43,7 +46,7 @@ fn main() {
 
     println!("Hello, world!");
 
-    let camera = Camera::new(COLS as f32 / ROWS as f32);
+    let camera = Camera::new(90.0, COLS as f32 / ROWS as f32);
     let reddish = Box::new(Lambertian { albedo: Vec3::new(0.7, 0.2, 0.3) });
     let greenish = Box::new(Lambertian { albedo: Vec3::new(0.1, 0.8, 0.3) });
     let brushed_gold = Box::new(Metal { albedo: Vec3::new(0.8, 0.6, 0.2), fuzz: 0.3 });
