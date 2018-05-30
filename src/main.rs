@@ -8,6 +8,7 @@ use std::path::Path;
 
 use rand::Rng;
 
+use raytrace::math;
 use raytrace::math::{Vec3,Ray};
 use raytrace::ppm::PpmImage;
 use raytrace::geometry;
@@ -46,12 +47,15 @@ fn main() {
     let reddish = Box::new(Lambertian { albedo: Vec3::new(0.7, 0.2, 0.3) });
     let greenish = Box::new(Lambertian { albedo: Vec3::new(0.1, 0.8, 0.3) });
     let brushed_gold = Box::new(Metal { albedo: Vec3::new(0.8, 0.6, 0.2), fuzz: 0.3 });
-    let silver = Box::new(Metal { albedo: Vec3::new(0.8, 0.8, 0.8), fuzz: 0.05 });
+    // let silver = Box::new(Metal { albedo: Vec3::new(0.8, 0.8, 0.8), fuzz: 0.05 });
+    let glass = Box::new(Dielectric { ref_index: 1.5 });
+    let glass2 = Box::new(Dielectric { ref_index: 1.5 });
     let mut objects : Vec<Box<Hitable>> = Vec::new();
     objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 0.0, -2.0), radius: 0.5, material: reddish }));
     objects.push(Box::new(Sphere { centre: Vec3::new(0.0, -100.5, -2.0), radius: 100.0, material: greenish }));
     objects.push(Box::new(Sphere { centre: Vec3::new(1.0, 0.0, -2.0), radius: 0.5, material: brushed_gold }));
-    objects.push(Box::new(Sphere { centre: Vec3::new(-1.0, 0.0, -2.0), radius: 0.5, material: silver }));
+    objects.push(Box::new(Sphere { centre: Vec3::new(-1.0, 0.0, -2.0), radius: 0.5, material: glass }));
+    objects.push(Box::new(Sphere { centre: Vec3::new(-1.0, 0.0, -2.0), radius: -0.45, material: glass2 }));
 
     let mut image = PpmImage::create(COLS, ROWS);
     let mut rng = rand::thread_rng();
@@ -110,14 +114,9 @@ struct Metal {
     fuzz: f32,
 }
 
-fn reflect(v: &Vec3, n: &Vec3) -> Vec3 {
-    // v - 2*dot(v,n)*n
-    v.sub(&n.mul(2.0 * v.dot(&n)))
-}
-
 impl Material for Metal {
     fn scatter(&self, ray: &Ray, hit: &HitRecord) -> Option<ScatterResult> {
-        let reflected = reflect(&ray.direction.normalise(), &hit.normal);
+        let reflected = math::reflect(&ray.direction.normalise(), &hit.normal);
         let reflected = reflected.add(&random_in_unit_sphere().mul(self.fuzz));
         if reflected.dot(&hit.normal) > 0.0 {
             let scattered = Ray { origin: hit.p.clone(), direction: reflected };
@@ -126,6 +125,51 @@ impl Material for Metal {
         else {
             None
         }
+    }
+}
+
+struct Dielectric {
+    ref_index: f32,
+}
+
+fn schlick(cosine: f32, ref_index: f32) -> f32 {
+    let r0 = (1.0 - ref_index) / (1.0 + ref_index);
+    let r0 = r0 * r0;
+    r0 + (1.0 - r0) * (1.0 - cosine).powi(5)
+}
+
+impl Material for Dielectric {
+    fn scatter(&self, ray: &Ray, hit: &HitRecord) -> Option<ScatterResult> {
+        let dir = ray.direction.normalise();
+        let reflected = math::reflect(&dir, &hit.normal);
+        let attenuation = Vec3::new(1.0, 1.0, 1.0);
+
+        let ray_dot_norm = ray.direction.dot(&hit.normal);
+        let cosine = ray_dot_norm / ray.direction.len_sq().sqrt();
+        let (outward_normal, ni_over_nt, cosine) =
+            if ray_dot_norm > 0.0 {
+                (hit.normal.mul(-1.0), self.ref_index, self.ref_index * cosine)
+            }
+            else {
+                (hit.normal.clone(), 1.0 / self.ref_index, -cosine)
+            };
+        
+        let (refracted, reflect_prob) =
+            match math::refract(&dir, &outward_normal, ni_over_nt) {
+                Some(refracted) => {
+                    (refracted, schlick(cosine, self.ref_index))
+                },
+                None => (Vec3::new(0.0, 0.0, 0.0), 1.0)
+            };
+        let ray_dir = 
+            if rand::thread_rng().gen::<f32>() < reflect_prob {
+                reflected
+            }
+            else {
+                refracted
+            };
+        let scattered = Ray { origin: hit.p.clone(), direction: ray_dir };
+        Some(ScatterResult { attenuation, scattered })
     }
 }
 

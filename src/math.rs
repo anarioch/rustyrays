@@ -70,6 +70,26 @@ impl Vec3 {
     }
 }
 
+pub fn reflect(v: &Vec3, n: &Vec3) -> Vec3 {
+    // v - 2*dot(v,n)*n
+    v.sub(&n.mul(2.0 * v.dot(&n)))
+}
+
+pub fn refract(v: &Vec3, n: &Vec3, ni_over_nt: f32) -> Option<Vec3> {
+    let v = v.normalise();
+    let dt = v.dot(&n);
+    let discriminant = 1.0 - ni_over_nt * ni_over_nt * (1.0 - dt * dt);
+    if discriminant > 0.0 {
+        // ni_over_nt * (v - n*dt) - sqrt(discriminant) * n
+        let refracted = v.sub(&n.mul(dt)).mul(ni_over_nt)
+            .sub(&n.mul(discriminant.sqrt()));
+        Some(refracted)
+    }
+    else {
+        None
+    }
+}
+
 pub struct Ray {
     pub origin: Vec3,
     pub direction: Vec3,
