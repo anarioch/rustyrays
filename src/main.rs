@@ -39,27 +39,48 @@ impl Camera {
     }
 }
 
-fn main() {
-    const COLS: usize = 400;
-    const ROWS: usize = 200;
-    const NUM_SAMPLES: usize = 100; // Sample code recommends 100 but this is slow
+fn random_scene() -> Vec<Box<Hitable>> {
+    let mut objects : Vec<Box<Hitable>> = Vec::new();
+    let mut rng = rand::thread_rng();
 
-    println!("Hello, world!");
+    // The giant world sphere on which all others sit
+    objects.push(Box::new(Sphere {
+        centre: Vec3::new(0.0, -1000.5, -2.0),
+        radius: 1000.0,
+        material: Box::new(Lambertian { albedo: Vec3::new(0.5, 0.5, 0.5) }),
+    }));
 
-    let camera = Camera::new(90.0, COLS as f32 / ROWS as f32);
+    // Randomise a bunch of spheres
+    for a in -5..5 {
+        for b in -5..5 {
+            let centre = Vec3::new(a as f32 + 0.9 * rng.gen::<f32>(), -0.3, b as f32 + 0.9 * rng.gen::<f32>());
+            let material = Box::new(Metal { albedo: Vec3::new(0.5 * (1.0 + rng.gen::<f32>()), 0.5 * (1.0 + rng.gen::<f32>()), 0.5 * (1.0 + rng.gen::<f32>())), fuzz: 0.5 * rng.gen::<f32>() });
+            objects.push(Box::new(Sphere { centre, radius: 0.2, material }));
+        }
+    }
     let reddish = Box::new(Lambertian { albedo: Vec3::new(0.7, 0.2, 0.3) });
-    let greenish = Box::new(Lambertian { albedo: Vec3::new(0.1, 0.8, 0.3) });
     let brushed_gold = Box::new(Metal { albedo: Vec3::new(0.8, 0.6, 0.2), fuzz: 0.3 });
     // let silver = Box::new(Metal { albedo: Vec3::new(0.8, 0.8, 0.8), fuzz: 0.05 });
     let glass = Box::new(Dielectric { ref_index: 1.5 });
     let glass2 = Box::new(Dielectric { ref_index: 1.5 });
-    let mut objects : Vec<Box<Hitable>> = Vec::new();
     objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 0.0, -2.0), radius: 0.5, material: reddish }));
-    objects.push(Box::new(Sphere { centre: Vec3::new(0.0, -100.5, -2.0), radius: 100.0, material: greenish }));
     objects.push(Box::new(Sphere { centre: Vec3::new(1.0, 0.0, -2.0), radius: 0.5, material: brushed_gold }));
     objects.push(Box::new(Sphere { centre: Vec3::new(-1.0, 0.0, -2.0), radius: 0.5, material: glass }));
     objects.push(Box::new(Sphere { centre: Vec3::new(-1.0, 0.0, -2.0), radius: -0.45, material: glass2 }));
 
+    objects
+}
+
+fn main() {
+    const COLS: usize = 400;
+    const ROWS: usize = 200;
+    const NUM_SAMPLES: usize = 100; // Sample code recommends 100 but this is slow
+    const MAX_BOUNCES: usize = 50;
+
+    println!("Hello, world!");
+
+    let camera = Camera::new(90.0, COLS as f32 / ROWS as f32);
+    let objects = random_scene();
     let mut image = PpmImage::create(COLS, ROWS);
     let mut rng = rand::thread_rng();
     for r in (0..ROWS).rev() {
@@ -72,7 +93,7 @@ fn main() {
                 let u = (pu + rng.gen::<f32>()) / COLS as f32;
                 let v = (pv + rng.gen::<f32>()) / ROWS as f32;
                 let ray = camera.clip_to_ray(u, v);
-                colour.add_eq(&ray_colour(&ray, &objects, 0));
+                colour.add_eq(&ray_colour(&ray, &objects, MAX_BOUNCES));
             }
             colour.mul_eq(1.0 / NUM_SAMPLES as f32);
             // Gamma correction: sqrt the colour
@@ -176,16 +197,16 @@ impl Material for Dielectric {
     }
 }
 
-fn ray_colour(ray: &Ray, objects: &Vec<Box<Hitable>>, depth: u32) -> Vec3 {
+fn ray_colour(ray: &Ray, objects: &Vec<Box<Hitable>>, depth: usize) -> Vec3 {
     match geometry::hit(&ray, 0.001, 1000.0, &objects) {
         Hit(record) => {
             // normal.normalise().add(&Vec3::new(1.0, 1.0, 1.0)).mul(0.5) // Use this return value to visualise normals
-            if depth >= 50 {
+            if depth == 0 {
                 return Vec3::new(0.0, 0.0, 0.0);
             }
             match record.material.scatter(&ray, &record) {
                 Some(scatter) => {
-                    let recurse = ray_colour(&scatter.scattered, &objects, depth + 1);
+                    let recurse = ray_colour(&scatter.scattered, &objects, depth - 1);
                     scatter.attenuation.mul_vec(&recurse)
                 },
                 None => Vec3::new(0.0, 0.0, 0.0)
