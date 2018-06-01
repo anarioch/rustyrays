@@ -9,7 +9,7 @@ use std::path::Path;
 use rand::Rng;
 
 use raytrace::math;
-use raytrace::math::{Vec3,Ray};
+use raytrace::math::*;
 use raytrace::ppm::PpmImage;
 use raytrace::geometry;
 use raytrace::geometry::*;
@@ -31,8 +31,8 @@ impl Camera {
 
         // Compute basis
         let w = lookfrom.sub(&lookat).normalise();
-        let u = vup.cross(&w).normalise();
-        let v = w.cross(&u);
+        let u = cross(&vup, &w).normalise();
+        let v = cross(&w, &u);
 
         // // Diagnostics
         // println!("u = {:?}", u);
@@ -93,7 +93,7 @@ fn random_scene() -> Vec<Box<Hitable>> {
 fn main() {
     const COLS: usize = 400;
     const ROWS: usize = 200;
-    const NUM_SAMPLES: usize = 100; // Sample code recommends 100 but this is slow
+    const NUM_SAMPLES: usize = 20; // Sample code recommends 100 but this is slow
     const MAX_BOUNCES: usize = 20;
 
     println!("Hello, world!");
@@ -169,7 +169,7 @@ impl Material for Metal {
     fn scatter(&self, ray: &Ray, hit: &HitRecord) -> Option<ScatterResult> {
         let reflected = math::reflect(&ray.direction.normalise(), &hit.normal);
         let reflected = reflected.add(&random_in_unit_sphere().mul(self.fuzz));
-        if reflected.dot(&hit.normal) > 0.0 {
+        if dot(&reflected, &hit.normal) > 0.0 {
             let scattered = Ray { origin: hit.p.clone(), direction: reflected };
             Some(ScatterResult { attenuation: self.albedo.clone(), scattered})
         }
@@ -195,7 +195,7 @@ impl Material for Dielectric {
         let reflected = math::reflect(&dir, &hit.normal);
         let attenuation = Vec3::new(1.0, 1.0, 1.0);
 
-        let ray_dot_norm = ray.direction.dot(&hit.normal);
+        let ray_dot_norm = dot(&ray.direction, &hit.normal);
         let cosine = ray_dot_norm / ray.direction.len_sq().sqrt();
         let (outward_normal, ni_over_nt, cosine) =
             if ray_dot_norm > 0.0 {

@@ -22,7 +22,7 @@ impl Vec3 {
     }
 
     pub fn normalise(&self) -> Vec3 {
-        let length = self.dot(&self).sqrt();
+        let length = self.len_sq().sqrt();
         self.mul(1.0 / length)
     }
 
@@ -61,31 +61,31 @@ impl Vec3 {
         self.z *= scale;
     }
 
-    pub fn dot(&self, other: &Vec3) -> f32 {
-        self.x * other.x + self.y * other.y + self.z * other.z
-    }
-
-    pub fn cross(&self, other: &Vec3) -> Vec3 {
-        Vec3 {
-            x: self.y * other.z - self.z * other.y,
-            y: -(self.x * other.z - self.z * other.x),
-            z: self.x * other.y - self.y * other.x,
-        }
-    }
-
     pub fn len_sq(&self) -> f32 {
-        self.dot(&self)
+        dot(&self, &self)
+    }
+}
+
+pub fn dot(v1: &Vec3, v2: &Vec3) -> f32 {
+    v1.x * v2.x + v1.y * v2.y + v1.z * v2.z
+}
+
+pub fn cross(v1: &Vec3, v2: &Vec3) -> Vec3 {
+    Vec3 {
+        x: v1.y * v2.z - v1.z * v2.y,
+        y: -(v1.x * v2.z - v1.z * v2.x),
+        z: v1.x * v2.y - v1.y * v2.x,
     }
 }
 
 pub fn reflect(v: &Vec3, n: &Vec3) -> Vec3 {
     // v - 2*dot(v,n)*n
-    v.sub(&n.mul(2.0 * v.dot(&n)))
+    v.sub(&n.mul(2.0 * dot(&v, &n)))
 }
 
 pub fn refract(v: &Vec3, n: &Vec3, ni_over_nt: f32) -> Option<Vec3> {
     let v = v.normalise();
-    let dt = v.dot(&n);
+    let dt = dot(&v, &n);
     let discriminant = 1.0 - ni_over_nt * ni_over_nt * (1.0 - dt * dt);
     if discriminant > 0.0 {
         // ni_over_nt * (v - n*dt) - sqrt(discriminant) * n
@@ -115,8 +115,7 @@ impl Ray {
 
 #[cfg(test)]
 mod tests {
-    use super::Vec3;
-    use super::Ray;
+    use super::*;
 
     #[test]
     fn vec3_add() {
@@ -164,6 +163,13 @@ mod tests {
         assert_eq!(normalised.x, 0.0);
         assert_eq!(normalised.y, 1.0);
         assert_eq!(normalised.z, 0.0);
+
+        // And another
+        let up = Vec3::new(0.0, 3.0, 4.0);
+        let normalised = up.normalise();
+        assert_eq!(normalised.x, 0.0);
+        assert_eq!(normalised.y, 3.0 / 5.0);
+        assert_eq!(normalised.z, 4.0 / 5.0);
     }
 
     #[test]
@@ -172,7 +178,7 @@ mod tests {
         let y_axis = Vec3::new(0.0, 1.0, 0.0);
         let z_axis = Vec3::new(0.0, 0.0, 1.0);
 
-        assert_eq!(&x_axis.cross(&y_axis), &z_axis);
+        assert_eq!(&cross(&x_axis, &y_axis), &z_axis);
     }
 
     #[test]

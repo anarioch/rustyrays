@@ -1,5 +1,5 @@
 
-use super::math::{Vec3,Ray};
+use super::math::*;
 
 pub struct HitRecord<'a> {
     pub t: f32,
@@ -46,7 +46,7 @@ impl Hitable for Sphere {
     fn hit(&self, ray: &Ray, t_min: f32, t_max: f32) -> HitResult {
         let oc = ray.origin.sub(&self.centre);
         let a = ray.direction.len_sq();
-        let b = 2.0 * oc.dot(&ray.direction);
+        let b = 2.0 * dot(&oc, &ray.direction);
         let c = oc.len_sq() - self.radius * self.radius;
         let discriminant = b * b - 4.0 * a * c;
         if discriminant < 0.0 {
@@ -91,7 +91,7 @@ pub fn hit<'a>(ray: &Ray, t_min: f32, t_max: f32, objects: &'a Vec<Box<Hitable>>
 
 #[cfg(test)]
 mod tests {
-    use super::super::math::{Vec3,Ray};
+    use super::super::math::*;
     use super::*;
     use super::HitResult::*;
 
