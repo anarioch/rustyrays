@@ -65,6 +65,14 @@ impl Vec3 {
         self.x * other.x + self.y * other.y + self.z * other.z
     }
 
+    pub fn cross(&self, other: &Vec3) -> Vec3 {
+        Vec3 {
+            x: self.y * other.z - self.z * other.y,
+            y: -(self.x * other.z - self.z * other.x),
+            z: self.x * other.y - self.y * other.x,
+        }
+    }
+
     pub fn len_sq(&self) -> f32 {
         self.dot(&self)
     }
@@ -90,6 +98,7 @@ pub fn refract(v: &Vec3, n: &Vec3, ni_over_nt: f32) -> Option<Vec3> {
     }
 }
 
+#[derive(Debug)]
 pub struct Ray {
     pub origin: Vec3,
     pub direction: Vec3,
@@ -155,5 +164,23 @@ mod tests {
         assert_eq!(normalised.x, 0.0);
         assert_eq!(normalised.y, 1.0);
         assert_eq!(normalised.z, 0.0);
+    }
+
+    #[test]
+    fn vec3_cross() {
+        let x_axis = Vec3::new(1.0, 0.0, 0.0);
+        let y_axis = Vec3::new(0.0, 1.0, 0.0);
+        let z_axis = Vec3::new(0.0, 0.0, 1.0);
+
+        assert_eq!(&x_axis.cross(&y_axis), &z_axis);
+    }
+
+    #[test]
+    fn ray_extrapolate() {
+        let ray = Ray { origin: Vec3::new(0.0, 0.0, 0.0), direction: Vec3::new(0.0, 0.0, -1.0) };
+
+        assert_eq!(ray.at_t(0.0), Vec3::new(0.0, 0.0, 0.0));
+        assert_eq!(ray.at_t(1.0), Vec3::new(0.0, 0.0, -1.0));
+        assert_eq!(ray.at_t(2.0), Vec3::new(0.0, 0.0, -2.0));
     }
 }

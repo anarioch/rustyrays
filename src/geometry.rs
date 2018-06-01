@@ -26,6 +26,16 @@ pub trait Material {
     fn scatter(&self, ray: &Ray, hit: &HitRecord) -> Option<ScatterResult>;
 }
 
+pub struct Invisible {
+    // Nothing here
+}
+
+impl Material for Invisible {
+    fn scatter(&self, _ray: &Ray, _hit: &HitRecord) -> Option<ScatterResult>{
+        None
+    }
+}
+
 pub struct Sphere {
     pub centre: Vec3,
     pub radius: f32,
@@ -40,25 +50,24 @@ impl Hitable for Sphere {
         let c = oc.len_sq() - self.radius * self.radius;
         let discriminant = b * b - 4.0 * a * c;
         if discriminant < 0.0 {
-            HitResult::Miss
+            return HitResult::Miss
+        }
+
+        let d_sqrt = discriminant.sqrt();
+        let t1 = (-b - d_sqrt) / (2.0 * a);
+        let t2 = (-b + d_sqrt) / (2.0 * a);
+        if t1 < t_max && t1 > t_min {
+            let p = ray.at_t(t1);
+            let normal = p.sub(&self.centre).mul(1.0/self.radius);
+            HitResult::Hit(HitRecord { t: t1, p, normal, material: &*self.material })
+        }
+        else if t2 < t_max && t2 > t_min {
+            let p = ray.at_t(t2);
+            let normal = p.sub(&self.centre).mul(1.0/self.radius);
+            HitResult::Hit(HitRecord { t: t2, p, normal, material: &*self.material })
         }
         else {
-            let d_sqrt = discriminant.sqrt();
-            let t1 = (-b - d_sqrt) / (2.0 * a);
-            let t2 = (-b + d_sqrt) / (2.0 * a);
-            if t1 < t_max && t1 > t_min {
-                let p = ray.at_t(t1);
-                let normal = p.sub(&self.centre).mul(1.0/self.radius);
-                HitResult::Hit(HitRecord { t: t1, p, normal, material: &*self.material })
-            }
-            else if t2 < t_max && t2 > t_min {
-                let p = ray.at_t(t2);
-                let normal = p.sub(&self.centre).mul(1.0/self.radius);
-                HitResult::Hit(HitRecord { t: t2, p, normal, material: &*self.material })
-            }
-            else {
-                HitResult::Miss
-            }
+            HitResult::Miss
         }
     }
 }
@@ -83,7 +92,7 @@ pub fn hit<'a>(ray: &Ray, t_min: f32, t_max: f32, objects: &'a Vec<Box<Hitable>>
 #[cfg(test)]
 mod tests {
     use super::super::math::{Vec3,Ray};
-    use super::{Sphere,Hitable};
+    use super::*;
     use super::HitResult::*;
 
     #[test]
@@ -93,7 +102,7 @@ mod tests {
         let down_y = Ray { origin: origin.clone(), direction: Vec3::new(0.0, -1.0, 0.0) };
         let down_y_parallel = Ray { origin: left.mul(2.0), direction: Vec3::new(0.0, -1.0, 0.0) };
         // Expected hit: ray along y axis and sphere 2 units down y axis
-        let sphere = Sphere { centre: Vec3::new(0.0, -2.0, 0.0), radius: 1.0 };
+        let sphere = Sphere { centre: Vec3::new(0.0, -2.0, 0.0), radius: 1.0, material: Box::new(Invisible {}) };
         match sphere.hit(&down_y, 0.0, 1000.0) {
             Miss => panic!("This ray and sphere were supposed to hit"),
             Hit(record) => assert_eq!(record.t, 1.0),
@@ -103,6 +112,5 @@ mod tests {
             Miss => (),
             Hit(_) => panic!("This ray and sphere were supposed to miss"),
         };
-        // assert_eq!(hit_sphere(&origin, 1.0, &down_z_parallel), SphereHitResult::Miss);
     }
 }

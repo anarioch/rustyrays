@@ -23,17 +23,36 @@ struct Camera {
 }
 
 impl Camera {
-    fn new(vfov: f32, aspect_ratio: f32) -> Camera {
+    fn new(lookfrom: Vec3, lookat: &Vec3, vup: &Vec3, vfov: f32, aspect_ratio: f32) -> Camera {
+        // Compute Field of View
         let theta = vfov * std::f32::consts::PI / 180.0;
         let half_height = (0.5 * theta).tan();
         let half_width = aspect_ratio * half_height;
-        Camera {
-            lower_left: Vec3::new(-half_width, -half_height, -2.0),
-            horizontal: Vec3::new(2.0 * half_width, 0.0, 0.0),
-            vertical: Vec3::new(0.0, 2.0 * half_height, 0.0),
-            origin: Vec3::new(0.0, 0.0, 0.0)
-        }
+
+        // Compute basis
+        let w = lookfrom.sub(&lookat).normalise();
+        let u = vup.cross(&w).normalise();
+        let v = w.cross(&u);
+
+        // // Diagnostics
+        // println!("u = {:?}", u);
+        // println!("v = {:?}", v);
+        // println!("w = {:?}", w);
+
+        let lower_left = lookfrom.sub(&u.mul(half_width)).sub(&v.mul(half_height)).sub(&w);
+        let horizontal = u.mul(2.0 * half_width);
+        let vertical = v.mul(2.0 * half_height);
+        let origin = lookfrom;
+
+        // // Diagnostics
+        // println!("origin     = {:?}", origin);
+        // println!("lower_left = {:?}", lower_left);
+        // println!("horizontal = {:?}", horizontal);
+        // println!("vertical   = {:?}", vertical);
+
+        Camera { lower_left, horizontal, vertical, origin }
     }
+
     fn clip_to_ray(&self, u: f32, v: f32) -> Ray {
         Ray::new(&self.origin, &self.lower_left.add(&self.horizontal.mul(u)).add(&self.vertical.mul(v)))
     }
@@ -75,11 +94,19 @@ fn main() {
     const COLS: usize = 400;
     const ROWS: usize = 200;
     const NUM_SAMPLES: usize = 100; // Sample code recommends 100 but this is slow
-    const MAX_BOUNCES: usize = 50;
+    const MAX_BOUNCES: usize = 20;
 
     println!("Hello, world!");
 
-    let camera = Camera::new(90.0, COLS as f32 / ROWS as f32);
+    const ASPECT_RATIO: f32 = COLS as f32 / ROWS as f32;
+    // Note: The projection is not working quite right, and distorts as the camera's origin moves away from the origin
+    // let camera = Camera::new(Vec3::new(-2.0, 2.0, 1.0), &Vec3::new(0.0, 0.0, -1.0), &Vec3::new(0.0, 1.0, 0.0), 90.0, ASPECT_RATIO);
+    let camera = Camera::new(Vec3::new(0.0, 0.0, 0.0), &Vec3::new(0.0, 0.0, -1.0), &Vec3::new(0.0, 1.0, 0.0), 45.0, ASPECT_RATIO);
+
+    println!("Ray(0  ,0.5) = {:?}", &camera.clip_to_ray(0.0, 0.5));
+    println!("Ray(0.5,0.5) = {:?}", &camera.clip_to_ray(0.5, 0.5));
+    println!("Ray(1  ,0.5) = {:?}", &camera.clip_to_ray(1.0, 0.5));
+
     let objects = random_scene();
     let mut image = PpmImage::create(COLS, ROWS);
     let mut rng = rand::thread_rng();
