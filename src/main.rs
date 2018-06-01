@@ -34,33 +34,24 @@ impl Camera {
         let u = cross(&vup, &w).normalise();
         let v = cross(&w, &u);
 
-        // // Diagnostics
-        // println!("u = {:?}", u);
-        // println!("v = {:?}", v);
-        // println!("w = {:?}", w);
-
+        // Compute vectors used to reconstitute the virtual screen that we project onto
         let lower_left = lookfrom.sub(&u.mul(half_width)).sub(&v.mul(half_height)).sub(&w);
         let horizontal = u.mul(2.0 * half_width);
         let vertical = v.mul(2.0 * half_height);
         let origin = lookfrom;
 
-        // // Diagnostics
-        // println!("origin     = {:?}", origin);
-        // println!("lower_left = {:?}", lower_left);
-        // println!("horizontal = {:?}", horizontal);
-        // println!("vertical   = {:?}", vertical);
-
         Camera { lower_left, horizontal, vertical, origin }
     }
 
     fn clip_to_ray(&self, u: f32, v: f32) -> Ray {
-        Ray::new(&self.origin, &self.lower_left.add(&self.horizontal.mul(u)).add(&self.vertical.mul(v)))
+        Ray::new(&self.origin, &self.lower_left.add(&self.horizontal.mul(u)).add(&self.vertical.mul(v)).sub(&self.origin))
     }
 }
 
 fn random_scene() -> Vec<Box<Hitable>> {
     let mut objects : Vec<Box<Hitable>> = Vec::new();
     let mut rng = rand::thread_rng();
+    let mut rand = || rng.gen::<f32>();
 
     // The giant world sphere on which all others sit
     objects.push(Box::new(Sphere {
@@ -72,40 +63,41 @@ fn random_scene() -> Vec<Box<Hitable>> {
     // Randomise a bunch of spheres
     for a in -5..5 {
         for b in -5..5 {
-            let centre = Vec3::new(a as f32 + 0.9 * rng.gen::<f32>(), -0.3, b as f32 + 0.9 * rng.gen::<f32>());
-            let material = Box::new(Metal { albedo: Vec3::new(0.5 * (1.0 + rng.gen::<f32>()), 0.5 * (1.0 + rng.gen::<f32>()), 0.5 * (1.0 + rng.gen::<f32>())), fuzz: 0.5 * rng.gen::<f32>() });
+            let centre = Vec3::new(a as f32 + 0.9 * rand(), -0.3, b as f32 + 0.9 * rand());
+            let material: Box<Material> = match rand() {
+                d if d < 0.65 => Box::new(Lambertian { albedo: Vec3::new(rand() * rand(), rand() * rand(), rand() * rand()) }),
+                d if d < 0.85 => Box::new(Metal { albedo: Vec3::new(0.5 * (1.0 + rand()), 0.5 * (1.0 + rand()), 0.5 * (1.0 + rand())), fuzz: 0.5 * rand() }),
+                _ => Box::new(Dielectric { ref_index: 1.5 }),
+            };
             objects.push(Box::new(Sphere { centre, radius: 0.2, material }));
         }
     }
     let reddish = Box::new(Lambertian { albedo: Vec3::new(0.7, 0.2, 0.3) });
-    let brushed_gold = Box::new(Metal { albedo: Vec3::new(0.8, 0.6, 0.2), fuzz: 0.3 });
-    // let silver = Box::new(Metal { albedo: Vec3::new(0.8, 0.8, 0.8), fuzz: 0.05 });
+    // let brushed_gold = Box::new(Metal { albedo: Vec3::new(0.8, 0.6, 0.2), fuzz: 0.3 });
+    let gold = Box::new(Metal { albedo: Vec3::new(0.8, 0.6, 0.2), fuzz: 0.0 });
     let glass = Box::new(Dielectric { ref_index: 1.5 });
     let glass2 = Box::new(Dielectric { ref_index: 1.5 });
-    objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 0.0, -2.0), radius: 0.5, material: reddish }));
-    objects.push(Box::new(Sphere { centre: Vec3::new(1.0, 0.0, -2.0), radius: 0.5, material: brushed_gold }));
-    objects.push(Box::new(Sphere { centre: Vec3::new(-1.0, 0.0, -2.0), radius: 0.5, material: glass }));
-    objects.push(Box::new(Sphere { centre: Vec3::new(-1.0, 0.0, -2.0), radius: -0.45, material: glass2 }));
+    objects.push(Box::new(Sphere { centre: Vec3::new(-4.0, 0.0, -1.0), radius: 0.5, material: reddish }));
+    objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 0.0, -1.0), radius: 0.5, material: glass }));
+    objects.push(Box::new(Sphere { centre: Vec3::new(4.0, 0.0, -1.0), radius: 0.5, material: gold }));
+
+    // Neat trick: embed a small sphere in another to simulate glass.  Might work by reversing coefficient also
+    // objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 0.0, -1.0), radius: 0.5, material: glass }));
+    // objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 0.0, -1.0), radius: -0.45, material: glass2 }));
 
     objects
 }
 
 fn main() {
-    const COLS: usize = 400;
-    const ROWS: usize = 200;
-    const NUM_SAMPLES: usize = 20; // Sample code recommends 100 but this is slow
-    const MAX_BOUNCES: usize = 20;
+    const COLS: usize = 800;
+    const ROWS: usize = 800;
+    const NUM_SAMPLES: usize = 100; // Sample code recommends 100 but this is slow
+    const MAX_BOUNCES: usize = 30;
 
     println!("Hello, world!");
 
     const ASPECT_RATIO: f32 = COLS as f32 / ROWS as f32;
-    // Note: The projection is not working quite right, and distorts as the camera's origin moves away from the origin
-    // let camera = Camera::new(Vec3::new(-2.0, 2.0, 1.0), &Vec3::new(0.0, 0.0, -1.0), &Vec3::new(0.0, 1.0, 0.0), 90.0, ASPECT_RATIO);
-    let camera = Camera::new(Vec3::new(0.0, 0.0, 0.0), &Vec3::new(0.0, 0.0, -1.0), &Vec3::new(0.0, 1.0, 0.0), 45.0, ASPECT_RATIO);
-
-    println!("Ray(0  ,0.5) = {:?}", &camera.clip_to_ray(0.0, 0.5));
-    println!("Ray(0.5,0.5) = {:?}", &camera.clip_to_ray(0.5, 0.5));
-    println!("Ray(1  ,0.5) = {:?}", &camera.clip_to_ray(1.0, 0.5));
+    let camera = Camera::new(Vec3::new(10.0, 0.5, 0.3), &Vec3::new(0.0, 0.0, -1.0), &Vec3::new(0.0, 1.0, 0.0), 20.0, ASPECT_RATIO);
 
     let objects = random_scene();
     let mut image = PpmImage::create(COLS, ROWS);
