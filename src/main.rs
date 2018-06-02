@@ -19,32 +19,40 @@ struct Camera {
     lower_left : Vec3,
     horizontal : Vec3,
     vertical : Vec3,
-    origin : Vec3,
+    eye : Vec3,
+    u: Vec3,
+    v: Vec3,
+    w: Vec3,
+    lens_radius: f32,
 }
 
 impl Camera {
-    fn new(lookfrom: Vec3, lookat: &Vec3, vup: &Vec3, vfov: f32, aspect_ratio: f32) -> Camera {
+    fn new(eye: Vec3, lookat: &Vec3, vup: &Vec3, vfov: f32, aspect_ratio: f32, aperture: f32, focus_dist: f32) -> Camera {
+        let lens_radius = 0.5 * aperture;
+
         // Compute Field of View
         let theta = vfov * std::f32::consts::PI / 180.0;
         let half_height = (0.5 * theta).tan();
         let half_width = aspect_ratio * half_height;
 
         // Compute basis
-        let w = lookfrom.sub(&lookat).normalise();
+        let w = eye.sub(&lookat).normalise();
         let u = cross(&vup, &w).normalise();
         let v = cross(&w, &u);
 
         // Compute vectors used to reconstitute the virtual screen that we project onto
-        let lower_left = lookfrom.sub(&u.mul(half_width)).sub(&v.mul(half_height)).sub(&w);
-        let horizontal = u.mul(2.0 * half_width);
-        let vertical = v.mul(2.0 * half_height);
-        let origin = lookfrom;
+        let lower_left = eye.sub(&u.mul(focus_dist*half_width)).sub(&v.mul(focus_dist*half_height)).sub(&w.mul(focus_dist));
+        let horizontal = u.mul(2.0 * focus_dist*half_width);
+        let vertical = v.mul(2.0 * focus_dist*half_height);
 
-        Camera { lower_left, horizontal, vertical, origin }
+        Camera { lower_left, horizontal, vertical, eye, u, v, w, lens_radius }
     }
 
     fn clip_to_ray(&self, u: f32, v: f32) -> Ray {
-        Ray::new(&self.origin, &self.lower_left.add(&self.horizontal.mul(u)).add(&self.vertical.mul(v)).sub(&self.origin))
+        let rd = random_in_unit_disk().mul(self.lens_radius);
+        let offset = self.u.mul(rd.x).add(&self.v.mul(rd.y));
+        let eye = self.eye.add(&offset);
+        Ray::new(&eye, &self.lower_left.add(&self.horizontal.mul(u)).add(&self.vertical.mul(v)).sub(&eye))
     }
 }
 
@@ -122,15 +130,21 @@ fn random_scene() -> Vec<Box<Hitable>> {
 }
 
 fn main() {
-    const COLS: usize = 200;
-    const ROWS: usize = 200;
+    const COLS: usize = 400;
+    const ROWS: usize = 400;
     const NUM_SAMPLES: usize = 100; // Sample code recommends 100 but this is slow
     const MAX_BOUNCES: usize = 30;
 
     println!("Hello, world!");
 
     const ASPECT_RATIO: f32 = COLS as f32 / ROWS as f32;
-    let camera = Camera::new(Vec3::new(10.0, 0.5, 0.3), &Vec3::new(0.0, 0.0, -1.0), &Vec3::new(0.0, 1.0, 0.0), 20.0, ASPECT_RATIO);
+    const APERTURE: f32 = 0.03;
+    const FIELD_OF_VIEW: f32 = 20.0;
+    let eye = Vec3::new(10.0, 0.5, 0.3);
+    let focus = Vec3::new(4.0, 0.2, -0.3);
+    let up = Vec3::new(0.0, 1.0, 0.0);
+    let dist_to_focus = focus.sub(&eye).len_sq().sqrt();
+    let camera = Camera::new(eye, &focus, &up, FIELD_OF_VIEW, ASPECT_RATIO, APERTURE, dist_to_focus);
 
     let objects = random_scene();
     let mut image = PpmImage::create(COLS, ROWS);
@@ -163,8 +177,19 @@ fn main() {
 fn random_in_unit_sphere() -> Vec3 {
     let mut p = Vec3::new(2.0, 2.0, 2.0);
     let mut rng = rand::thread_rng();
+    let mut rand = || rng.gen::<f32>();
     while p.len_sq() >= 1.0 {
-        p.set(2.0 * rng.gen::<f32>() - 1.0, 2.0 * rng.gen::<f32>() - 1.0, 2.0 * rng.gen::<f32>() - 1.0);
+        p.set(2.0 * rand() - 1.0, 2.0 * rand() - 1.0, 2.0 * rand() - 1.0);
+    }
+    p
+}
+
+fn random_in_unit_disk() -> Vec3 {
+    let mut p = Vec3::new(2.0, 2.0, 2.0);
+    let mut rng = rand::thread_rng();
+    let mut rand = || rng.gen::<f32>();
+    while p.len_sq() >= 1.0 {
+        p.set(2.0 * rand() - 1.0, 2.0 * rand() - 1.0, 0.0);
     }
     p
 }
