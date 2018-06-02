@@ -60,28 +60,61 @@ fn random_scene() -> Vec<Box<Hitable>> {
         material: Box::new(Lambertian { albedo: Vec3::new(0.5, 0.5, 0.5) }),
     }));
 
-    // Randomise a bunch of spheres
-    for a in -5..5 {
-        for b in -5..5 {
-            let centre = Vec3::new(a as f32 + 0.9 * rand(), -0.3, b as f32 + 0.9 * rand());
-            let material: Box<Material> = match rand() {
-                d if d < 0.65 => Box::new(Lambertian { albedo: Vec3::new(rand() * rand(), rand() * rand(), rand() * rand()) }),
-                d if d < 0.85 => Box::new(Metal { albedo: Vec3::new(0.5 * (1.0 + rand()), 0.5 * (1.0 + rand()), 0.5 * (1.0 + rand())), fuzz: 0.5 * rand() }),
-                _ => Box::new(Dielectric { ref_index: 1.5 }),
-            };
-            objects.push(Box::new(Sphere { centre, radius: 0.2, material }));
+    // Create closure that creates a randomised sphere within the x,z unit cell
+    let mut random_sphere = |x, z| {
+        let centre = Vec3::new(x + 0.9 * rand(), -0.3, z + 0.9 * rand());
+        let material: Box<Material> = match rand() {
+            d if d < 0.65 => Box::new(Lambertian { albedo: Vec3::new(rand() * rand(), rand() * rand(), rand() * rand()) }),
+            d if d < 0.85 => Box::new(Metal { albedo: Vec3::new(0.5 * (1.0 + rand()), 0.5 * (1.0 + rand()), 0.5 * (1.0 + rand())), fuzz: 0.5 * rand() }),
+            _ => Box::new(Dielectric { ref_index: 1.5 }),
+        };
+        Sphere { centre, radius: 0.2, material }
+    };
+
+    let check_spheres = |clump: &Clump| {
+        for sphere in clump.objects.iter() {
+            let dist = sphere.centre.sub(&clump.bounds.centre).len_sq().sqrt();
+            if dist + sphere.radius > clump.bounds.radius {
+                panic!("Sphere is outside!");
+            }
         }
-    }
+    };
+    // Randomise a bunch of spheres, putting them into a quadrant of clumps to optimise ray lookup
+    let mut clump_a = Clump { bounds: Bounds { centre: Vec3::new(-3.5, -0.3, -3.5), radius: 1.5 * 3.5}, objects: Vec::new() };
+    let mut clump_b = Clump { bounds: Bounds { centre: Vec3::new(-3.5, -0.3, 3.5), radius: 1.5 * 3.5}, objects: Vec::new() };
+    let mut clump_c = Clump { bounds: Bounds { centre: Vec3::new(3.5, -0.3, -3.5), radius: 1.5 * 32.5}, objects: Vec::new() };
+    let mut clump_d = Clump { bounds: Bounds { centre: Vec3::new(3.5, -0.3, 3.5), radius: 1.5 * 3.5}, objects: Vec::new() };
+    for a in -7..0 { for b in -7..0 {
+        clump_a.objects.push(random_sphere(a as f32, b as f32));
+    } }
+    for a in -7..0 { for b in 0..7 {
+        clump_b.objects.push(random_sphere(a as f32, b as f32));
+    } }
+    for a in 0..7 { for b in -7..0 {
+        clump_c.objects.push(random_sphere(a as f32, b as f32));
+    } }
+    for a in 0..7 { for b in 0..7 {
+        clump_d.objects.push(random_sphere(a as f32, b as f32));
+    } }
+    check_spheres(&clump_a);
+    check_spheres(&clump_b);
+    check_spheres(&clump_c);
+    check_spheres(&clump_d);
+    objects.push(Box::new(clump_a));
+    objects.push(Box::new(clump_b));
+    objects.push(Box::new(clump_c));
+    objects.push(Box::new(clump_d));
+
     let reddish = Box::new(Lambertian { albedo: Vec3::new(0.7, 0.2, 0.3) });
     // let brushed_gold = Box::new(Metal { albedo: Vec3::new(0.8, 0.6, 0.2), fuzz: 0.3 });
     let gold = Box::new(Metal { albedo: Vec3::new(0.8, 0.6, 0.2), fuzz: 0.0 });
     let glass = Box::new(Dielectric { ref_index: 1.5 });
-    let glass2 = Box::new(Dielectric { ref_index: 1.5 });
     objects.push(Box::new(Sphere { centre: Vec3::new(-4.0, 0.0, -1.0), radius: 0.5, material: reddish }));
     objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 0.0, -1.0), radius: 0.5, material: glass }));
     objects.push(Box::new(Sphere { centre: Vec3::new(4.0, 0.0, -1.0), radius: 0.5, material: gold }));
 
     // Neat trick: embed a small sphere in another to simulate glass.  Might work by reversing coefficient also
+    // let glass2 = Box::new(Dielectric { ref_index: 1.5 });
     // objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 0.0, -1.0), radius: 0.5, material: glass }));
     // objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 0.0, -1.0), radius: -0.45, material: glass2 }));
 
@@ -89,8 +122,8 @@ fn random_scene() -> Vec<Box<Hitable>> {
 }
 
 fn main() {
-    const COLS: usize = 800;
-    const ROWS: usize = 800;
+    const COLS: usize = 200;
+    const ROWS: usize = 200;
     const NUM_SAMPLES: usize = 100; // Sample code recommends 100 but this is slow
     const MAX_BOUNCES: usize = 30;
 
@@ -128,13 +161,10 @@ fn main() {
 }
 
 fn random_in_unit_sphere() -> Vec3 {
-    let unit = Vec3::new(1.0, 1.0, 1.0);
     let mut p = Vec3::new(2.0, 2.0, 2.0);
     let mut rng = rand::thread_rng();
     while p.len_sq() >= 1.0 {
-        p.set(rng.gen::<f32>(), rng.gen::<f32>(), rng.gen::<f32>());
-        p.mul_eq(2.0);
-        p.sub_eq(&unit);
+        p.set(2.0 * rng.gen::<f32>() - 1.0, 2.0 * rng.gen::<f32>() - 1.0, 2.0 * rng.gen::<f32>() - 1.0);
     }
     p
 }

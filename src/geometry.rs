@@ -36,43 +36,93 @@ impl Material for Invisible {
     }
 }
 
+pub struct Bounds {
+    pub centre: Vec3,
+    pub radius: f32,
+}
+
 pub struct Sphere {
     pub centre: Vec3,
     pub radius: f32,
     pub material: Box<Material>,
 }
 
+fn sphere_ray_intersect(ray: &Ray, t_min: f32, t_max: f32, centre: &Vec3, radius: f32) -> Option<f32> {
+    let oc = ray.origin.sub(&centre);
+    let a = ray.direction.len_sq();
+    let b = 2.0 * dot(&oc, &ray.direction);
+    let c = oc.len_sq() - radius * radius;
+    let discriminant = b * b - 4.0 * a * c;
+    if discriminant < 0.0 {
+        return None
+    }
+
+    let d_sqrt = discriminant.sqrt();
+    let t1 = (-b - d_sqrt) / (2.0 * a);
+    if t1 < t_max && t1 > t_min {
+        return Some(t1);
+    }
+
+    let t2 = (-b + d_sqrt) / (2.0 * a);
+    if t2 < t_max && t2 > t_min {
+        return Some(t2);
+    }
+
+    None
+}
+
 impl Hitable for Sphere {
     fn hit(&self, ray: &Ray, t_min: f32, t_max: f32) -> HitResult {
-        let oc = ray.origin.sub(&self.centre);
-        let a = ray.direction.len_sq();
-        let b = 2.0 * dot(&oc, &ray.direction);
-        let c = oc.len_sq() - self.radius * self.radius;
-        let discriminant = b * b - 4.0 * a * c;
-        if discriminant < 0.0 {
-            return HitResult::Miss
-        }
-
-        let d_sqrt = discriminant.sqrt();
-        let t1 = (-b - d_sqrt) / (2.0 * a);
-        let t2 = (-b + d_sqrt) / (2.0 * a);
-        if t1 < t_max && t1 > t_min {
-            let p = ray.at_t(t1);
-            let normal = p.sub(&self.centre).mul(1.0/self.radius);
-            HitResult::Hit(HitRecord { t: t1, p, normal, material: &*self.material })
-        }
-        else if t2 < t_max && t2 > t_min {
-            let p = ray.at_t(t2);
-            let normal = p.sub(&self.centre).mul(1.0/self.radius);
-            HitResult::Hit(HitRecord { t: t2, p, normal, material: &*self.material })
-        }
-        else {
-            HitResult::Miss
+        match sphere_ray_intersect(&ray, t_min, t_max, &self.centre, self.radius) {
+            Some(t) => {
+                let p = ray.at_t(t);
+                let normal = p.sub(&self.centre).mul(1.0/self.radius);
+                HitResult::Hit(HitRecord { t, p, normal, material: &*self.material })
+            },
+            None => HitResult::Miss,
         }
     }
 }
 
+pub struct Clump {
+    pub bounds: Bounds,
+    pub objects: Vec<Sphere>,
+}
+
+impl Hitable for Clump {
+    fn hit<'a>(&'a self, ray: &Ray, t_min: f32, t_max: f32) -> HitResult<'a> {
+        // Bounds check for the clump
+        // Note the full t range; otherwise the segment is inside completely
+        if let None = sphere_ray_intersect(&ray, 0.001, 1000.0, &self.bounds.centre, self.bounds.radius) {
+            return HitResult::Miss;
+        }
+
+        // Check each contained object
+        let mut result = HitResult::Miss;
+        let mut closest_so_far = t_max;
+        for obj in self.objects.iter() {
+            if let HitResult::Hit(record) = obj.hit(&ray, t_min, closest_so_far) {
+                closest_so_far = record.t;
+                result = HitResult::Hit(record);
+            };
+        }
+
+        result
+    }
+}
+
 pub fn hit<'a>(ray: &Ray, t_min: f32, t_max: f32, objects: &'a Vec<Box<Hitable>>) -> HitResult<'a> {
+    // // This algorithm seems like the more Rust-like way to do it.
+    // // But because it doesn't get to prune future checks based on already seen objects, it is slower.
+    // // Perhaps it would be better with multiple threads, or spatially grouped objects
+    // match objects.iter()
+    //         .map(|obj| obj.hit(&ray, t_min, t_max))
+    //         .filter_map(|h| match h { HitResult::Hit(record) => Some(record), _ => None })
+    //         .min_by(|h1, h2| h1.t.partial_cmp(&h2.t).unwrap()) {
+    //     Some(record) => HitResult::Hit(record),
+    //     None => HitResult::Miss,
+    // }
+
     let mut result = HitResult::Miss;
     let mut closest_so_far = t_max;
     for obj in objects {
