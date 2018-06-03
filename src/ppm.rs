@@ -11,8 +11,8 @@ impl PpmImage {
         PpmImage { width, height, body: String::from("") }
     }
 
-    pub fn append_pixel(&mut self, colour: &Vec3) {
-        let colour = colour.mul(255.0);
+    pub fn append_pixel(&mut self, colour: Vec3) {
+        let colour = colour * 255.0;
         self.body.push_str(&format!("{:4} {:4} {:4}", colour.x as u32, colour.y as u32, colour.z as u32));
     }
 

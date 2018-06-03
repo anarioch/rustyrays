@@ -47,10 +47,10 @@ pub struct Sphere {
     pub material: Box<Material>,
 }
 
-fn sphere_ray_intersect(ray: &Ray, t_min: f32, t_max: f32, centre: &Vec3, radius: f32) -> Option<f32> {
-    let oc = ray.origin.sub(&centre);
+fn sphere_ray_intersect(ray: &Ray, t_min: f32, t_max: f32, centre: Vec3, radius: f32) -> Option<f32> {
+    let oc = ray.origin - centre;
     let a = ray.direction.len_sq();
-    let b = 2.0 * dot(&oc, &ray.direction);
+    let b = 2.0 * dot(oc, ray.direction);
     let c = oc.len_sq() - radius * radius;
     let discriminant = b * b - 4.0 * a * c;
     if discriminant < 0.0 {
@@ -73,10 +73,10 @@ fn sphere_ray_intersect(ray: &Ray, t_min: f32, t_max: f32, centre: &Vec3, radius
 
 impl Hitable for Sphere {
     fn hit(&self, ray: &Ray, t_min: f32, t_max: f32) -> HitResult {
-        match sphere_ray_intersect(&ray, t_min, t_max, &self.centre, self.radius) {
+        match sphere_ray_intersect(&ray, t_min, t_max, self.centre, self.radius) {
             Some(t) => {
                 let p = ray.at_t(t);
-                let normal = p.sub(&self.centre).mul(1.0/self.radius);
+                let normal = (p - self.centre) * (1.0/self.radius);
                 HitResult::Hit(HitRecord { t, p, normal, material: &*self.material })
             },
             None => HitResult::Miss,
@@ -93,7 +93,7 @@ impl Hitable for Clump {
     fn hit<'a>(&'a self, ray: &Ray, t_min: f32, t_max: f32) -> HitResult<'a> {
         // Bounds check for the clump
         // Note the full t range; otherwise the segment is inside completely
-        if let None = sphere_ray_intersect(&ray, 0.001, 1000.0, &self.bounds.centre, self.bounds.radius) {
+        if let None = sphere_ray_intersect(&ray, 0.001, 1000.0, self.bounds.centre, self.bounds.radius) {
             return HitResult::Miss;
         }
 
@@ -149,8 +149,8 @@ mod tests {
     fn hit_sphere_works() {
         let origin = Vec3::new(0.0, 0.0, 0.0);
         let left = Vec3::new(-1.0, 0.0, 0.0);
-        let down_y = Ray { origin: origin.clone(), direction: Vec3::new(0.0, -1.0, 0.0) };
-        let down_y_parallel = Ray { origin: left.mul(2.0), direction: Vec3::new(0.0, -1.0, 0.0) };
+        let down_y = Ray { origin, direction: Vec3::new(0.0, -1.0, 0.0) };
+        let down_y_parallel = Ray { origin: 2.0 * left, direction: Vec3::new(0.0, -1.0, 0.0) };
         // Expected hit: ray along y axis and sphere 2 units down y axis
         let sphere = Sphere { centre: Vec3::new(0.0, -2.0, 0.0), radius: 1.0, material: Box::new(Invisible {}) };
         match sphere.hit(&down_y, 0.0, 1000.0) {

@@ -27,7 +27,7 @@ struct Camera {
 }
 
 impl Camera {
-    fn new(eye: Vec3, lookat: &Vec3, vup: &Vec3, vfov: f32, aspect_ratio: f32, aperture: f32, focus_dist: f32) -> Camera {
+    fn new(eye: Vec3, lookat: Vec3, vup: Vec3, vfov: f32, aspect_ratio: f32, aperture: f32, focus_dist: f32) -> Camera {
         let lens_radius = 0.5 * aperture;
 
         // Compute Field of View
@@ -36,23 +36,23 @@ impl Camera {
         let half_width = aspect_ratio * half_height;
 
         // Compute basis
-        let w = eye.sub(&lookat).normalise();
-        let u = cross(&vup, &w).normalise();
-        let v = cross(&w, &u);
+        let w = (eye - lookat).normalise();
+        let u = cross(vup, w).normalise();
+        let v = cross(w, u);
 
         // Compute vectors used to reconstitute the virtual screen that we project onto
-        let lower_left = eye.sub(&u.mul(focus_dist*half_width)).sub(&v.mul(focus_dist*half_height)).sub(&w.mul(focus_dist));
-        let horizontal = u.mul(2.0 * focus_dist*half_width);
-        let vertical = v.mul(2.0 * focus_dist*half_height);
+        let lower_left = eye - u*(focus_dist*half_width) - v*(focus_dist*half_height) - w*focus_dist;
+        let horizontal = u*(2.0 * focus_dist*half_width);
+        let vertical = v*(2.0 * focus_dist*half_height);
 
         Camera { lower_left, horizontal, vertical, eye, u, v, w, lens_radius }
     }
 
     fn clip_to_ray(&self, u: f32, v: f32) -> Ray {
-        let rd = random_in_unit_disk().mul(self.lens_radius);
-        let offset = self.u.mul(rd.x).add(&self.v.mul(rd.y));
-        let eye = self.eye.add(&offset);
-        Ray::new(&eye, &self.lower_left.add(&self.horizontal.mul(u)).add(&self.vertical.mul(v)).sub(&eye))
+        let rd = random_in_unit_disk() * self.lens_radius;
+        let offset = self.u * rd.x + self.v * rd.y;
+        let eye = self.eye + offset;
+        Ray::new(eye, self.lower_left + self.horizontal * u + self.vertical * v - eye)
     }
 }
 
@@ -81,7 +81,7 @@ fn random_scene() -> Vec<Box<Hitable>> {
 
     let check_spheres = |clump: &Clump| {
         for sphere in clump.objects.iter() {
-            let dist = sphere.centre.sub(&clump.bounds.centre).len_sq().sqrt();
+            let dist = (sphere.centre - clump.bounds.centre).len_sq().sqrt();
             if dist + sphere.radius > clump.bounds.radius {
                 panic!("Sphere is outside!");
             }
@@ -143,8 +143,8 @@ fn main() {
     let eye = Vec3::new(10.0, 0.5, 0.3);
     let focus = Vec3::new(4.0, 0.2, -0.3);
     let up = Vec3::new(0.0, 1.0, 0.0);
-    let dist_to_focus = focus.sub(&eye).len_sq().sqrt();
-    let camera = Camera::new(eye, &focus, &up, FIELD_OF_VIEW, ASPECT_RATIO, APERTURE, dist_to_focus);
+    let dist_to_focus = (focus - eye).len_sq().sqrt();
+    let camera = Camera::new(eye, focus, up, FIELD_OF_VIEW, ASPECT_RATIO, APERTURE, dist_to_focus);
 
     let objects = random_scene();
     let mut image = PpmImage::create(COLS, ROWS);
@@ -159,13 +159,13 @@ fn main() {
                 let u = (pu + rng.gen::<f32>()) / COLS as f32;
                 let v = (pv + rng.gen::<f32>()) / ROWS as f32;
                 let ray = camera.clip_to_ray(u, v);
-                colour.add_eq(&ray_colour(&ray, &objects, MAX_BOUNCES));
+                colour += ray_colour(&ray, &objects, MAX_BOUNCES);
             }
-            colour.mul_eq(1.0 / NUM_SAMPLES as f32);
+            colour *= 1.0 / NUM_SAMPLES as f32;
             // Gamma correction: sqrt the colour
             let colour = Vec3::new(colour.x.sqrt(), colour.y.sqrt(), colour.z.sqrt());
             // Output the colour for this pixel
-            image.append_pixel(&colour);
+            image.append_pixel(colour);
         }
     }
 
@@ -200,10 +200,10 @@ struct Lambertian {
 
 impl Material for Lambertian {
     fn scatter(&self, _ray: &Ray, hit: &HitRecord) -> Option<ScatterResult> {
-        let target = hit.p.add(&hit.normal).add(&random_in_unit_sphere());
-        let dir = target.sub(&hit.p);
-        let scattered = Ray { origin: hit.p.clone(), direction: dir };
-        Some(ScatterResult { attenuation: self.albedo.clone(), scattered})
+        let target = hit.p + hit.normal + random_in_unit_sphere();
+        let dir = target - hit.p;
+        let scattered = Ray { origin: hit.p, direction: dir };
+        Some(ScatterResult { attenuation: self.albedo, scattered})
     }
 }
 
@@ -214,11 +214,11 @@ struct Metal {
 
 impl Material for Metal {
     fn scatter(&self, ray: &Ray, hit: &HitRecord) -> Option<ScatterResult> {
-        let reflected = math::reflect(&ray.direction.normalise(), &hit.normal);
-        let reflected = reflected.add(&random_in_unit_sphere().mul(self.fuzz));
-        if dot(&reflected, &hit.normal) > 0.0 {
-            let scattered = Ray { origin: hit.p.clone(), direction: reflected };
-            Some(ScatterResult { attenuation: self.albedo.clone(), scattered})
+        let reflected = math::reflect(ray.direction.normalise(), hit.normal);
+        let reflected = reflected + self.fuzz * random_in_unit_sphere();
+        if dot(reflected, hit.normal) > 0.0 {
+            let scattered = Ray { origin: hit.p, direction: reflected };
+            Some(ScatterResult { attenuation: self.albedo, scattered})
         }
         else {
             None
@@ -239,21 +239,21 @@ fn schlick(cosine: f32, ref_index: f32) -> f32 {
 impl Material for Dielectric {
     fn scatter(&self, ray: &Ray, hit: &HitRecord) -> Option<ScatterResult> {
         let dir = ray.direction.normalise();
-        let reflected = math::reflect(&dir, &hit.normal);
+        let reflected = math::reflect(dir, hit.normal);
         let attenuation = Vec3::new(1.0, 1.0, 1.0);
 
-        let ray_dot_norm = dot(&ray.direction, &hit.normal);
+        let ray_dot_norm = dot(ray.direction, hit.normal);
         let cosine = ray_dot_norm / ray.direction.len_sq().sqrt();
         let (outward_normal, ni_over_nt, cosine) =
             if ray_dot_norm > 0.0 {
-                (hit.normal.mul(-1.0), self.ref_index, self.ref_index * cosine)
+                (-hit.normal, self.ref_index, self.ref_index * cosine)
             }
             else {
-                (hit.normal.clone(), 1.0 / self.ref_index, -cosine)
+                (hit.normal, 1.0 / self.ref_index, -cosine)
             };
         
         let (refracted, reflect_prob) =
-            match math::refract(&dir, &outward_normal, ni_over_nt) {
+            match math::refract(dir, outward_normal, ni_over_nt) {
                 Some(refracted) => {
                     (refracted, schlick(cosine, self.ref_index))
                 },
@@ -266,7 +266,7 @@ impl Material for Dielectric {
             else {
                 refracted
             };
-        let scattered = Ray { origin: hit.p.clone(), direction: ray_dir };
+        let scattered = Ray { origin: hit.p, direction: ray_dir };
         Some(ScatterResult { attenuation, scattered })
     }
 }
@@ -274,14 +274,14 @@ impl Material for Dielectric {
 fn ray_colour(ray: &Ray, objects: &Vec<Box<Hitable>>, depth: usize) -> Vec3 {
     match geometry::hit(&ray, 0.001, 1000.0, &objects) {
         Hit(record) => {
-            // normal.normalise().add(&Vec3::new(1.0, 1.0, 1.0)).mul(0.5) // Use this return value to visualise normals
+            // (normal.normalise() + Vec3::new(1.0, 1.0, 1.0)) * 0.5 // Use this return value to visualise normals
             if depth == 0 {
                 return Vec3::new(0.0, 0.0, 0.0);
             }
             match record.material.scatter(&ray, &record) {
                 Some(scatter) => {
                     let recurse = ray_colour(&scatter.scattered, &objects, depth - 1);
-                    scatter.attenuation.mul_vec(&recurse)
+                    scatter.attenuation.mul_vec(recurse)
                 },
                 None => Vec3::new(0.0, 0.0, 0.0)
             }
@@ -291,7 +291,7 @@ fn ray_colour(ray: &Ray, objects: &Vec<Box<Hitable>>, depth: usize) -> Vec3 {
             let t = 0.5 * (unit.y + 1.0);
             let blue = Vec3::new(0.5, 0.7, 1.0);
             let white = Vec3::new(1.0, 1.0, 1.0);
-            white.mul(1.0 - t).add(&blue.mul(t))
+            white*(1.0 - t) + blue*t
         }
     }
 }

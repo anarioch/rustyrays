@@ -1,5 +1,6 @@
+use std::ops::{Add,AddAssign,Sub,Mul,MulAssign,Neg};
 
-#[derive(PartialEq,Debug)]
+#[derive(PartialEq,Debug,Clone,Copy)]
 pub struct Vec3 {
     pub x: f32,
     pub y: f32,
@@ -10,9 +11,6 @@ impl Vec3 {
 
     pub fn new(x: f32, y: f32, z: f32) -> Vec3 {
         Vec3 { x, y, z }
-    }
-    pub fn clone(&self) -> Vec3 {
-        Vec3 { x: self.x, y: self.y, z: self.z }
     }
 
     pub fn set(&mut self, x: f32, y: f32, z: f32) {
@@ -26,51 +24,99 @@ impl Vec3 {
         self.mul(1.0 / length)
     }
 
-    // TODO: Figure out how to make these operator overloads
-    pub fn add(&self, other: &Vec3) -> Vec3 {
-        Vec3 { x: self.x + other.x, y: self.y + other.y, z: self.z + other.z }
-    }
-
-    pub fn sub(&self, other: &Vec3) -> Vec3 {
-        Vec3 { x: self.x - other.x, y: self.y - other.y, z: self.z - other.z }
-    }
-
-    pub fn mul_vec(&self, other: &Vec3) -> Vec3 {
+    pub fn mul_vec(&self, other: Vec3) -> Vec3 {
         Vec3 { x: self.x * other.x, y: self.y * other.y, z: self.z * other.z }
     }
 
-    pub fn mul(&self, scale: f32) -> Vec3 {
-        Vec3 { x: self.x * scale, y: self.y * scale, z: self.z * scale }
-    }
-
-    pub fn add_eq(&mut self, other: &Vec3) {
-        self.x += other.x;
-        self.y += other.y;
-        self.z += other.z;
-    }
-
-    pub fn sub_eq(&mut self, other: &Vec3) {
-        self.x -= other.x;
-        self.y -= other.y;
-        self.z -= other.z;
-    }
-
-    pub fn mul_eq(&mut self, scale: f32) {
-        self.x *= scale;
-        self.y *= scale;
-        self.z *= scale;
-    }
-
     pub fn len_sq(&self) -> f32 {
-        dot(&self, &self)
+        dot(*self, *self)
+    }
+
+    // pub fn length(&self) -> f32 {
+    //     dot(self, self).sqrt()
+    // }
+}
+
+impl Add for Vec3 {
+    type Output = Vec3;
+    fn add(self, other: Vec3) -> Vec3 {
+        Vec3 {
+            x: self.x + other.x,
+            y: self.y + other.y,
+            z: self.z + other.z,
+        }
     }
 }
 
-pub fn dot(v1: &Vec3, v2: &Vec3) -> f32 {
+impl AddAssign for Vec3 {
+    fn add_assign(&mut self, other: Vec3) {
+        *self = Vec3 {
+            x: self.x + other.x,
+            y: self.y + other.y,
+            z: self.z + other.z,
+        };
+    }
+}
+
+impl Sub for Vec3 {
+    type Output = Vec3;
+    fn sub(self, other: Vec3) -> Vec3 {
+        Vec3 {
+            x: self.x - other.x,
+            y: self.y - other.y,
+            z: self.z - other.z,
+        }
+    }
+}
+
+impl Mul<f32> for Vec3 {
+    type Output = Vec3;
+    fn mul(self, scale: f32) -> Vec3 {
+        Vec3 {
+            x: self.x * scale,
+            y: self.y * scale,
+            z: self.z * scale,
+        }
+    }
+}
+
+impl Mul<Vec3> for f32 {
+    type Output = Vec3;
+    fn mul(self, vec: Vec3) -> Vec3 {
+        Vec3 {
+            x: self * vec.x,
+            y: self * vec.y,
+            z: self * vec.z,
+        }
+    }
+}
+
+impl MulAssign<f32> for Vec3 {
+    fn mul_assign(&mut self, scale: f32) {
+        *self = Vec3 {
+            x: self.x * scale,
+            y: self.y * scale,
+            z: self.z * scale,
+        };
+    }
+}
+
+impl Neg for Vec3 {
+    type Output = Vec3;
+    fn neg(self) -> Vec3 {
+        Vec3 {
+            x: -self.x,
+            y: -self.y,
+            z: -self.z,
+        }
+    }
+}
+
+pub fn dot(v1: Vec3, v2: Vec3) -> f32 {
     v1.x * v2.x + v1.y * v2.y + v1.z * v2.z
 }
 
-pub fn cross(v1: &Vec3, v2: &Vec3) -> Vec3 {
+pub fn cross(v1: Vec3, v2: Vec3) -> Vec3 {
     Vec3 {
         x: v1.y * v2.z - v1.z * v2.y,
         y: -(v1.x * v2.z - v1.z * v2.x),
@@ -78,19 +124,17 @@ pub fn cross(v1: &Vec3, v2: &Vec3) -> Vec3 {
     }
 }
 
-pub fn reflect(v: &Vec3, n: &Vec3) -> Vec3 {
+pub fn reflect(v: Vec3, n: Vec3) -> Vec3 {
     // v - 2*dot(v,n)*n
-    v.sub(&n.mul(2.0 * dot(&v, &n)))
+    v - 2.0 * dot(v, n) * n
 }
 
-pub fn refract(v: &Vec3, n: &Vec3, ni_over_nt: f32) -> Option<Vec3> {
+pub fn refract(v: Vec3, n: Vec3, ni_over_nt: f32) -> Option<Vec3> {
     let v = v.normalise();
-    let dt = dot(&v, &n);
+    let dt = dot(v, n);
     let discriminant = 1.0 - ni_over_nt * ni_over_nt * (1.0 - dt * dt);
     if discriminant > 0.0 {
-        // ni_over_nt * (v - n*dt) - sqrt(discriminant) * n
-        let refracted = v.sub(&n.mul(dt)).mul(ni_over_nt)
-            .sub(&n.mul(discriminant.sqrt()));
+        let refracted = ni_over_nt * (v - n*dt) - discriminant.sqrt() * n;
         Some(refracted)
     }
     else {
@@ -105,11 +149,11 @@ pub struct Ray {
 }
 
 impl Ray {
-    pub fn new(origin: &Vec3, direction: &Vec3) -> Ray {
-        Ray { origin: origin.clone(), direction: direction.clone() }
+    pub fn new(origin: Vec3, direction: Vec3) -> Ray {
+        Ray { origin, direction }
     }
     pub fn at_t(&self, t: f32) -> Vec3 {
-        self.origin.add(&self.direction.mul(t))
+        self.origin + self.direction * t
     }
 }
 
@@ -122,7 +166,7 @@ mod tests {
         let v1 = Vec3::new(1.0, 2.0, 3.0);
         let v2 = Vec3::new(-1.0, 5.0, 0.0);
 
-        assert_eq!(v1.add(&v2), Vec3::new(0.0, 7.0, 3.0));
+        assert_eq!(v1 + v2, Vec3::new(0.0, 7.0, 3.0));
     }
 
     #[test]
@@ -130,7 +174,7 @@ mod tests {
         let v1 = Vec3::new(1.0, 2.0, 3.0);
         let v2 = Vec3::new(-1.0, 5.0, 0.0);
 
-        assert_eq!(v1.sub(&v2), Vec3::new(2.0, -3.0, 3.0));
+        assert_eq!(v1 - v2, Vec3::new(2.0, -3.0, 3.0));
     }
 
     #[test]
@@ -145,7 +189,7 @@ mod tests {
     fn vec3_mul() {
         let v1 = Vec3::new(1.0, 2.0, -3.0);
 
-        assert_eq!(v1.mul(3.0), Vec3::new(3.0, 6.0, -9.0));
+        assert_eq!(v1 * 3.0, Vec3::new(3.0, 6.0, -9.0));
     }
 
     #[test]
@@ -178,7 +222,7 @@ mod tests {
         let y_axis = Vec3::new(0.0, 1.0, 0.0);
         let z_axis = Vec3::new(0.0, 0.0, 1.0);
 
-        assert_eq!(&cross(&x_axis, &y_axis), &z_axis);
+        assert_eq!(cross(x_axis, y_axis), z_axis);
     }
 
     #[test]
