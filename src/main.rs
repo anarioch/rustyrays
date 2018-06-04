@@ -121,7 +121,7 @@ fn random_scene() -> Vec<Box<Hitable>> {
     objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 0.0, -1.0), radius: 0.5, material: glass }));
     objects.push(Box::new(Sphere { centre: Vec3::new(4.0, 0.0, -1.0), radius: 0.5, material: gold }));
 
-    let bulb = Box::new(DiffuseLight { emission_colour: Vec3::new(4.0, 4.0, 4.0) });
+    let bulb = Box::new(DiffuseLight { emission_colour: Vec3::new(2.0, 2.0, 2.0) });
     objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 10.0, -1.0), radius: 5.0, material: bulb }));
 
     // Neat trick: embed a small sphere in another to simulate glass.  Might work by reversing coefficient also
@@ -155,6 +155,13 @@ fn main() {
     let dist_to_focus = (focus - eye).len_sq().sqrt();
     let camera = Camera::new(eye, focus, up, FIELD_OF_VIEW, ASPECT_RATIO, APERTURE, dist_to_focus);
 
+    let max_iterations = COLS * ROWS;
+    let mut num_iterations = 0;
+    let mut last_time = std::time::Instant::now();
+    print!("Processing...");
+    let io_flush = || std::io::stdout().flush().ok().expect("Could not flush stdout");
+    io_flush();
+
     let objects = random_scene();
     let mut image = PpmImage::create(COLS, ROWS);
     let mut rng = rand::thread_rng();
@@ -177,8 +184,17 @@ fn main() {
             let colour = colour.map(|x| x.sqrt());
             // Output the colour for this pixel
             image.append_pixel(colour);
+
+            num_iterations += 1;
+            if last_time.elapsed().as_secs() >= 1 {
+                print!("\rProcessed {:.2}%", 100.0 * num_iterations as f32 / max_iterations as f32);
+                io_flush();
+                last_time += std::time::Duration::from_secs(1);
+            }
         }
     }
+
+    println!("\rProcessing done, writing file");
 
     // Output the image to a file
     let path = Path::new("out/output.ppm");

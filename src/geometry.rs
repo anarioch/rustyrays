@@ -1,6 +1,7 @@
 
 use super::math::*;
 
+/// A record of where a ray hit an object, including a reference to the material
 pub struct HitRecord<'a> {
     pub t: f32,
     pub p: Vec3,
