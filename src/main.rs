@@ -14,6 +14,7 @@ use raytrace::ppm::PpmImage;
 use raytrace::geometry;
 use raytrace::geometry::*;
 use raytrace::geometry::HitResult::{Hit,Miss};
+use raytrace::materials::*;
 
 struct Camera {
     lower_left : Vec3,
@@ -62,17 +63,22 @@ fn random_scene() -> Vec<Box<Hitable>> {
     let mut rand = || rng.gen::<f32>();
 
     // The giant world sphere on which all others sit
+    let globe_texture = CheckerTexture {
+        check_size: 10.0,
+        odd: Box::new(ConstantTexture { colour: Vec3::new(0.2, 0.3, 0.1) }),
+        even: Box::new(ConstantTexture { colour: Vec3::new(0.9, 0.9, 0.9) }),
+    };
     objects.push(Box::new(Sphere {
         centre: Vec3::new(0.0, -1000.5, -2.0),
         radius: 1000.0,
-        material: Box::new(Lambertian { albedo: Vec3::new(0.5, 0.5, 0.5) }),
+        material: Box::new(Lambertian { albedo: Box::new(globe_texture) }),
     }));
 
     // Create closure that creates a randomised sphere within the x,z unit cell
     let mut random_sphere = |x, z| {
         let centre = Vec3::new(x + 0.9 * rand(), -0.3, z + 0.9 * rand());
         let material: Box<Material> = match rand() {
-            d if d < 0.65 => Box::new(Lambertian { albedo: Vec3::new(rand() * rand(), rand() * rand(), rand() * rand()) }),
+            d if d < 0.65 => Box::new(Lambertian { albedo: Box::new(ConstantTexture { colour: Vec3::new(rand() * rand(), rand() * rand(), rand() * rand()) }) }),
             d if d < 0.85 => Box::new(Metal { albedo: Vec3::new(0.5 * (1.0 + rand()), 0.5 * (1.0 + rand()), 0.5 * (1.0 + rand())), fuzz: 0.5 * rand() }),
             _ => Box::new(Dielectric { ref_index: 1.5 }),
         };
@@ -113,7 +119,7 @@ fn random_scene() -> Vec<Box<Hitable>> {
     objects.push(Box::new(clump_c));
     objects.push(Box::new(clump_d));
 
-    let reddish = Box::new(Lambertian { albedo: Vec3::new(0.7, 0.2, 0.3) });
+    let reddish = Box::new(Lambertian { albedo: Box::new(ConstantTexture { colour: Vec3::new(0.7, 0.2, 0.3) }) });
     // let brushed_gold = Box::new(Metal { albedo: Vec3::new(0.8, 0.6, 0.2), fuzz: 0.3 });
     let gold = Box::new(Metal { albedo: Vec3::new(0.8, 0.6, 0.2), fuzz: 0.0 });
     let glass = Box::new(Dielectric { ref_index: 1.5 });
@@ -222,15 +228,16 @@ fn random_in_unit_disk() -> Vec3 {
 }
 
 struct Lambertian {
-    albedo: Vec3,
+    albedo: Box<Texture>,
 }
 
 impl Material for Lambertian {
     fn scatter(&self, _ray: &Ray, hit: &HitRecord) -> Option<ScatterResult> {
         let target = hit.p + hit.normal + random_in_unit_sphere();
         let dir = target - hit.p;
+        let attenuation = self.albedo.value(0.0, 0.0, hit.p);
         let scattered = Ray { origin: hit.p, direction: dir };
-        Some(ScatterResult { attenuation: self.albedo, scattered})
+        Some(ScatterResult { attenuation, scattered})
     }
 }
 
