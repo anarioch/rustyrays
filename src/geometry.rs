@@ -24,6 +24,9 @@ pub struct ScatterResult {
 
 pub trait Material {
     fn scatter(&self, ray: &Ray, hit: &HitRecord) -> Option<ScatterResult>;
+    fn emit(&self) -> Vec3 {
+        Vec3::new(0.0, 0.0, 0.0)
+    }
 }
 
 pub struct Invisible {

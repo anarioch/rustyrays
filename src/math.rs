@@ -32,6 +32,13 @@ impl Vec3 {
         dot(*self, *self)
     }
 
+    pub fn map(&self, f: fn(f32) -> f32) -> Vec3 {
+        Vec3 {
+            x: f(self.x),
+            y: f(self.y),
+            z: f(self.z),
+        }
+    }
     // pub fn length(&self) -> f32 {
     //     dot(self, self).sqrt()
     // }

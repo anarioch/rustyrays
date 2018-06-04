@@ -121,12 +121,21 @@ fn random_scene() -> Vec<Box<Hitable>> {
     objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 0.0, -1.0), radius: 0.5, material: glass }));
     objects.push(Box::new(Sphere { centre: Vec3::new(4.0, 0.0, -1.0), radius: 0.5, material: gold }));
 
+    let bulb = Box::new(DiffuseLight { emission_colour: Vec3::new(4.0, 4.0, 4.0) });
+    objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 10.0, -1.0), radius: 5.0, material: bulb }));
+
     // Neat trick: embed a small sphere in another to simulate glass.  Might work by reversing coefficient also
     // let glass2 = Box::new(Dielectric { ref_index: 1.5 });
     // objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 0.0, -1.0), radius: 0.5, material: glass }));
     // objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 0.0, -1.0), radius: -0.45, material: glass2 }));
 
     objects
+}
+
+fn clamp(mut x: f32, min: f32, max: f32) -> f32 {
+    if x < min { x = min; }
+    if x > max { x = max; }
+    x
 }
 
 fn main() {
@@ -162,8 +171,10 @@ fn main() {
                 colour += ray_colour(&ray, &objects, MAX_BOUNCES);
             }
             colour *= 1.0 / NUM_SAMPLES as f32;
+            // Clamp the colour to [0..1]
+            let colour = colour.map(|x| clamp(x, 0.0, 1.0));
             // Gamma correction: sqrt the colour
-            let colour = Vec3::new(colour.x.sqrt(), colour.y.sqrt(), colour.z.sqrt());
+            let colour = colour.map(|x| x.sqrt());
             // Output the colour for this pixel
             image.append_pixel(colour);
         }
@@ -271,6 +282,19 @@ impl Material for Dielectric {
     }
 }
 
+pub struct DiffuseLight {
+    emission_colour: Vec3,
+}
+
+impl Material for DiffuseLight {
+    fn scatter(&self, _ray: &Ray, _hit: &HitRecord) -> Option<ScatterResult> {
+        None
+    }
+    fn emit(&self) -> Vec3 {
+        self.emission_colour
+    }
+}
+
 fn ray_colour(ray: &Ray, objects: &Vec<Box<Hitable>>, depth: usize) -> Vec3 {
     match geometry::hit(&ray, 0.001, 1000.0, &objects) {
         Hit(record) => {
@@ -278,19 +302,21 @@ fn ray_colour(ray: &Ray, objects: &Vec<Box<Hitable>>, depth: usize) -> Vec3 {
             if depth == 0 {
                 return Vec3::new(0.0, 0.0, 0.0);
             }
+            let emission = record.material.emit();
             match record.material.scatter(&ray, &record) {
                 Some(scatter) => {
                     let recurse = ray_colour(&scatter.scattered, &objects, depth - 1);
-                    scatter.attenuation.mul_vec(recurse)
+                    emission + scatter.attenuation.mul_vec(recurse)
                 },
-                None => Vec3::new(0.0, 0.0, 0.0)
+                None => emission
             }
         },
         Miss => {
+            // Vec3::new(0.0, 0.0, 0.0)
             let unit = ray.direction.normalise();
             let t = 0.5 * (unit.y + 1.0);
-            let blue = Vec3::new(0.5, 0.7, 1.0);
-            let white = Vec3::new(1.0, 1.0, 1.0);
+            let blue = Vec3::new(0.25, 0.35, 0.5);
+            let white = Vec3::new(0.4, 0.4, 0.4);
             white*(1.0 - t) + blue*t
         }
     }
