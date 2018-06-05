@@ -1,3 +1,5 @@
+extern crate rand;
+
 pub mod math;
 pub mod ppm;
 pub mod geometry;

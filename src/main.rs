@@ -138,6 +138,25 @@ fn random_scene() -> Vec<Box<Hitable>> {
     objects
 }
 
+fn noise_scene() -> Vec<Box<Hitable>> {
+    let mut objects : Vec<Box<Hitable>> = Vec::new();
+    let mut rng = rand::thread_rng();
+    let mut rand = || rng.gen::<f32>();
+
+    // The giant world sphere on which all others sit
+    let noise1 = Box::new(Lambertian { albedo: Box::new(NoiseTexture::new(4.0, Vec3::new(0.5, 0.5, 0.5))) });
+    objects.push(Box::new(Sphere {
+        centre: Vec3::new(0.0, -1000.5, -2.0),
+        radius: 1000.0,
+        material: noise1,
+    }));
+
+    let noise2 = Box::new(Lambertian { albedo: Box::new(NoiseTexture::new(12.0, Vec3::new(0.5, 0.5, 0.5))) });
+    objects.push(Box::new(Sphere { centre: Vec3::new(4.0, 0.0, -1.0), radius: 0.5, material: noise2 }));
+
+    objects
+}
+
 fn clamp(mut x: f32, min: f32, max: f32) -> f32 {
     if x < min { x = min; }
     if x > max { x = max; }
@@ -152,6 +171,7 @@ fn main() {
 
     println!("Hello, world!");
 
+    // Configure the camera
     const ASPECT_RATIO: f32 = COLS as f32 / ROWS as f32;
     const APERTURE: f32 = 0.03;
     const FIELD_OF_VIEW: f32 = 20.0;
@@ -168,7 +188,11 @@ fn main() {
     let io_flush = || std::io::stdout().flush().ok().expect("Could not flush stdout");
     io_flush();
 
-    let objects = random_scene();
+    // Generate the scene
+    // let objects = random_scene();
+    let objects = noise_scene();
+
+    // Cast rays to generate the image
     let mut image = PpmImage::create(COLS, ROWS);
     let mut rng = rand::thread_rng();
     for r in (0..ROWS).rev() {
