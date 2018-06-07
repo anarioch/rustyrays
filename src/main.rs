@@ -50,6 +50,9 @@ impl Camera {
     }
 
     fn clip_to_ray(&self, u: f32, v: f32) -> Ray {
+        // // Basic projection
+        // Ray::new(self.eye, self.lower_left + self.horizontal * u + self.vertical * v - self.eye)
+        // Add noise to eye location to achieve depth-if-field
         let rd = random_in_unit_disk() * self.lens_radius;
         let offset = self.u * rd.x + self.v * rd.y;
         let eye = self.eye + offset;
@@ -119,13 +122,14 @@ fn random_scene() -> Vec<Box<Hitable>> {
     objects.push(Box::new(clump_c));
     objects.push(Box::new(clump_d));
 
-    let reddish = Box::new(Lambertian { albedo: Box::new(ConstantTexture { colour: Vec3::new(0.7, 0.2, 0.3) }) });
+    // let reddish = Box::new(Lambertian { albedo: Box::new(ConstantTexture { colour: Vec3::new(0.7, 0.2, 0.3) }) });
     // let brushed_gold = Box::new(Metal { albedo: Vec3::new(0.8, 0.6, 0.2), fuzz: 0.3 });
     let gold = Box::new(Metal { albedo: Vec3::new(0.8, 0.6, 0.2), fuzz: 0.0 });
+    let marble = Box::new(PolishedStone { albedo: Box::new(NoiseTexture::new(12.0, Vec3::new(0.6, 0.1, 0.2))) });
     let glass = Box::new(Dielectric { ref_index: 1.5 });
-    objects.push(Box::new(Sphere { centre: Vec3::new(-4.0, 0.0, -1.0), radius: 0.5, material: reddish }));
+    objects.push(Box::new(Sphere { centre: Vec3::new(-4.0, 0.0, -1.0), radius: 0.5, material: gold }));
     objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 0.0, -1.0), radius: 0.5, material: glass }));
-    objects.push(Box::new(Sphere { centre: Vec3::new(4.0, 0.0, -1.0), radius: 0.5, material: gold }));
+    objects.push(Box::new(Sphere { centre: Vec3::new(4.0, 0.0, -1.0), radius: 0.5, material: marble }));
 
     let bulb = Box::new(DiffuseLight { emission_colour: Vec3::new(2.0, 2.0, 2.0) });
     objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 10.0, -1.0), radius: 5.0, material: bulb }));
@@ -144,15 +148,15 @@ fn noise_scene() -> Vec<Box<Hitable>> {
     let mut rand = || rng.gen::<f32>();
 
     // The giant world sphere on which all others sit
-    let noise1 = Box::new(Lambertian { albedo: Box::new(NoiseTexture::new(4.0, Vec3::new(0.5, 0.5, 0.5))) });
+    let noise1 = Box::new(Lambertian { albedo: Box::new(NoiseTexture::new(4.0, Vec3::new(1.0, 1.0, 1.0))) });
     objects.push(Box::new(Sphere {
         centre: Vec3::new(0.0, -1000.5, -2.0),
         radius: 1000.0,
         material: noise1,
     }));
 
-    let noise2 = Box::new(Lambertian { albedo: Box::new(NoiseTexture::new(12.0, Vec3::new(0.5, 0.5, 0.5))) });
-    objects.push(Box::new(Sphere { centre: Vec3::new(4.0, 0.0, -1.0), radius: 0.5, material: noise2 }));
+    let marble = Box::new(PolishedStone { albedo: Box::new(NoiseTexture::new(12.0, Vec3::new(0.6, 0.2, 0.1))) });
+    objects.push(Box::new(Sphere { centre: Vec3::new(4.0, 0.0, -1.0), radius: 0.5, material: marble }));
 
     objects
 }
@@ -164,8 +168,8 @@ fn clamp(mut x: f32, min: f32, max: f32) -> f32 {
 }
 
 fn main() {
-    const COLS: usize = 400;
-    const ROWS: usize = 400;
+    const COLS: usize = 1500;
+    const ROWS: usize = 1500;
     const NUM_SAMPLES: usize = 100; // Sample code recommends 100 but this is slow
     const MAX_BOUNCES: usize = 30;
 
@@ -189,8 +193,8 @@ fn main() {
     io_flush();
 
     // Generate the scene
-    // let objects = random_scene();
-    let objects = noise_scene();
+    let objects = random_scene();
+    // let objects = noise_scene();
 
     // Cast rays to generate the image
     let mut image = PpmImage::create(COLS, ROWS);
@@ -281,6 +285,28 @@ impl Material for Metal {
         else {
             None
         }
+    }
+}
+
+struct PolishedStone {
+    albedo: Box<Texture>,
+}
+
+impl Material for PolishedStone {
+    fn scatter(&self, ray: &Ray, hit: &HitRecord) -> Option<ScatterResult> {
+        let reflected = math::reflect(ray.direction.normalise(), hit.normal);
+        let dotty = dot(reflected, hit.normal);
+        let reflect_prob = 1.0 - dotty.sqrt();
+        let (attenuation, direction) = if rand::thread_rng().gen::<f32>() < reflect_prob {
+            (Vec3::new(1.0, 1.0, 1.0), reflected)
+        }
+        else {
+            let attenuation = self.albedo.value(0.0, 0.0, hit.p);
+            let scattered = hit.normal + random_in_unit_sphere();
+            (attenuation, scattered)
+        };
+        let scattered = Ray { origin: hit.p, direction };
+        Some(ScatterResult { attenuation, scattered})
     }
 }
 

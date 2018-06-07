@@ -6,3 +6,4 @@ authors = ["Jerome Dolman <jerome@novapsi.net.nz>"]
 [dependencies]
 
 rand = "0.5.0"
+noise = "0.5.1"
