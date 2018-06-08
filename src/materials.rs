@@ -1,7 +1,5 @@
 
-use rand::{thread_rng,Rng};
-use rand::distributions::Standard;
-use noise::{NoiseFn,Perlin,Turbulence};
+use noise::{NoiseFn,Perlin};
 
 use super::math::*;
 
@@ -54,7 +52,7 @@ fn turb(noise: &Perlin, p: Vec3, depth: usize) -> f32 {
     let mut accum = 0.0;
     let mut temp_p = p;
     let mut weight = 1.0;
-    for i in 0..depth {
+    for _i in 0..depth {
         accum += weight * noise.get([temp_p.x as f64, temp_p.y as f64, temp_p.z as f64]);
         weight *= 0.5;
         temp_p *= 2.0;
@@ -63,7 +61,7 @@ fn turb(noise: &Perlin, p: Vec3, depth: usize) -> f32 {
 }
 
 impl Texture for NoiseTexture {
-    fn value(&self, u: f32, v: f32, p: Vec3) -> Vec3 {
+    fn value(&self, _u: f32, _v: f32, p: Vec3) -> Vec3 {
 
         // let noise = self.perlin.get([p.x as f64, p.y as f64, p.z as f64]);
         let noise = turb(&self.perlin, p, 7);

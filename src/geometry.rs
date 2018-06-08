@@ -177,14 +177,10 @@ pub fn hit<'a>(ray: &Ray, t_min: f32, t_max: f32, objects: &'a Vec<Box<Hitable>>
     let mut result = HitResult::Miss;
     let mut closest_so_far = t_max;
     for obj in objects {
-        match (*obj).hit(&ray, t_min, closest_so_far) {
-            HitResult::Hit(record) => {
-                closest_so_far = record.t;
-                result = HitResult::Hit(record);
-            },
-            HitResult::Miss => {
-            }
-        };
+        if let HitResult::Hit(record) = (*obj).hit(&ray, t_min, closest_so_far) {
+            closest_so_far = record.t;
+            result = HitResult::Hit(record);
+        }
     }
 
     result
