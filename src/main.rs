@@ -66,26 +66,31 @@ fn random_scene() -> Vec<Box<Hitable>> {
     let mut rand = || rng.gen::<f32>();
 
     // The giant world sphere on which all others sit
+    let world_centre = Vec3::new(0.0, -1000.0, 0.0);
+    let world_radius = 1000.0;
     let globe_texture = CheckerTexture {
         check_size: 10.0,
         odd: Box::new(ConstantTexture { colour: Vec3::new(0.2, 0.3, 0.1) }),
         even: Box::new(ConstantTexture { colour: Vec3::new(0.9, 0.9, 0.9) }),
     };
     objects.push(Box::new(Sphere {
-        centre: Vec3::new(0.0, -1000.5, -2.0),
-        radius: 1000.0,
+        centre: world_centre,
+        radius: world_radius,
         material: Box::new(Lambertian { albedo: Box::new(globe_texture) }),
     }));
 
     // Create closure that creates a randomised sphere within the x,z unit cell
+    let rad_sq = world_radius * world_radius;
     let mut random_sphere = |x, z| {
-        let centre = Vec3::new(x + 0.9 * rand(), -0.3, z + 0.9 * rand());
+        let radius = 0.2;
+        let mut centre = Vec3::new(x + 0.9 * rand(), 0.0, z + 0.9 * rand());
+        centre.y = (rad_sq - centre.x * centre.x).sqrt() - world_radius + radius;
         let material: Box<Material> = match rand() {
             d if d < 0.65 => Box::new(Lambertian { albedo: Box::new(ConstantTexture { colour: Vec3::new(rand() * rand(), rand() * rand(), rand() * rand()) }) }),
             d if d < 0.85 => Box::new(Metal { albedo: Vec3::new(0.5 * (1.0 + rand()), 0.5 * (1.0 + rand()), 0.5 * (1.0 + rand())), fuzz: 0.5 * rand() }),
             _ => Box::new(Dielectric { ref_index: 1.5 }),
         };
-        Sphere { centre, radius: 0.2, material }
+        Sphere { centre, radius, material }
     };
 
     let check_spheres = |clump: &Clump| {
@@ -97,10 +102,10 @@ fn random_scene() -> Vec<Box<Hitable>> {
         }
     };
     // Randomise a bunch of spheres, putting them into a quadrant of clumps to optimise ray lookup
-    let mut clump_a = Clump { bounds: Bounds { centre: Vec3::new(-3.5, -0.3, -3.5), radius: 1.5 * 3.5}, objects: Vec::new() };
-    let mut clump_b = Clump { bounds: Bounds { centre: Vec3::new(-3.5, -0.3, 3.5), radius: 1.5 * 3.5}, objects: Vec::new() };
-    let mut clump_c = Clump { bounds: Bounds { centre: Vec3::new(3.5, -0.3, -3.5), radius: 1.5 * 32.5}, objects: Vec::new() };
-    let mut clump_d = Clump { bounds: Bounds { centre: Vec3::new(3.5, -0.3, 3.5), radius: 1.5 * 3.5}, objects: Vec::new() };
+    let mut clump_a = Clump { bounds: Bounds { centre: Vec3::new(-3.5, 0.2, -3.5), radius: 1.5 * 3.5}, objects: Vec::new() };
+    let mut clump_b = Clump { bounds: Bounds { centre: Vec3::new(-3.5, 0.2, 3.5), radius: 1.5 * 3.5}, objects: Vec::new() };
+    let mut clump_c = Clump { bounds: Bounds { centre: Vec3::new(3.5, 0.2, -3.5), radius: 1.5 * 32.5}, objects: Vec::new() };
+    let mut clump_d = Clump { bounds: Bounds { centre: Vec3::new(3.5, 0.2, 3.5), radius: 1.5 * 3.5}, objects: Vec::new() };
     for a in -7..0 { for b in -7..0 {
         clump_a.objects.push(random_sphere(a as f32, b as f32));
     } }
@@ -127,9 +132,9 @@ fn random_scene() -> Vec<Box<Hitable>> {
     let gold = Box::new(Metal { albedo: Vec3::new(0.8, 0.6, 0.2), fuzz: 0.0 });
     let marble = Box::new(PolishedStone { albedo: Box::new(NoiseTexture::new(12.0, Vec3::new(0.6, 0.1, 0.2))) });
     let glass = Box::new(Dielectric { ref_index: 1.5 });
-    objects.push(Box::new(Sphere { centre: Vec3::new(-4.0, 0.0, -1.0), radius: 0.5, material: gold }));
-    objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 0.0, -1.0), radius: 0.5, material: glass }));
-    objects.push(Box::new(Sphere { centre: Vec3::new(4.0, 0.0, -1.0), radius: 0.5, material: marble }));
+    objects.push(Box::new(Sphere { centre: Vec3::new(-4.0, 0.5, -1.0), radius: 0.5, material: gold }));
+    objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 0.5, -1.0), radius: 0.5, material: glass }));
+    objects.push(Box::new(Sphere { centre: Vec3::new(4.0, 0.5, -1.0), radius: 0.5, material: marble }));
 
     let bulb = Box::new(DiffuseLight { emission_colour: Vec3::new(2.0, 2.0, 2.0) });
     objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 10.0, -1.0), radius: 5.0, material: bulb }));
@@ -144,8 +149,6 @@ fn random_scene() -> Vec<Box<Hitable>> {
 
 fn noise_scene() -> Vec<Box<Hitable>> {
     let mut objects : Vec<Box<Hitable>> = Vec::new();
-    let mut rng = rand::thread_rng();
-    let mut rand = || rng.gen::<f32>();
 
     // The giant world sphere on which all others sit
     let noise1 = Box::new(Lambertian { albedo: Box::new(NoiseTexture::new(4.0, Vec3::new(1.0, 1.0, 1.0))) });
@@ -170,7 +173,7 @@ fn clamp(mut x: f32, min: f32, max: f32) -> f32 {
 fn main() {
     const COLS: usize = 1500;
     const ROWS: usize = 1500;
-    const NUM_SAMPLES: usize = 100; // Sample code recommends 100 but this is slow
+    const NUM_SAMPLES: usize = 200; // Sample code recommends 100 but this is slow
     const MAX_BOUNCES: usize = 30;
 
     println!("Hello, world!");
@@ -179,8 +182,8 @@ fn main() {
     const ASPECT_RATIO: f32 = COLS as f32 / ROWS as f32;
     const APERTURE: f32 = 0.03;
     const FIELD_OF_VIEW: f32 = 20.0;
-    let eye = Vec3::new(10.0, 0.5, 0.3);
-    let focus = Vec3::new(4.0, 0.2, -0.3);
+    let eye = Vec3::new(10.0, 1.1, 0.3);
+    let focus = Vec3::new(4.0, 0.55, -0.3);
     let up = Vec3::new(0.0, 1.0, 0.0);
     let dist_to_focus = (focus - eye).len_sq().sqrt();
     let camera = Camera::new(eye, focus, up, FIELD_OF_VIEW, ASPECT_RATIO, APERTURE, dist_to_focus);
@@ -193,8 +196,11 @@ fn main() {
     io_flush();
 
     // Generate the scene
-    let objects = random_scene();
-    // let objects = noise_scene();
+    let scene_index = 1;
+    let objects = match scene_index {
+        0 => noise_scene(),
+        _ => random_scene(),
+    };
 
     // Cast rays to generate the image
     let mut image = PpmImage::create(COLS, ROWS);
