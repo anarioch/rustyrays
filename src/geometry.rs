@@ -88,6 +88,53 @@ impl Hitable for Sphere {
     }
 }
 
+pub enum AARectWhich {
+    XY,
+    XZ,
+    YZ,
+}
+pub struct AARect {
+    pub which: AARectWhich,
+    pub a_min: f32,
+    pub a_max: f32,
+    pub b_min: f32,
+    pub b_max: f32,
+    pub c: f32,
+    pub negate_normal: bool,
+    pub material: Box<Material>,
+}
+
+impl Hitable for AARect {
+    fn hit(&self, ray: &Ray, t_min: f32, t_max: f32) -> HitResult {
+        // Swizzle the inputs to match an XY plane layout
+        let origin = ray.origin;
+        let direction = ray.direction;
+        let (origin, direction) = match self.which {
+            AARectWhich::XY => (origin, direction),
+            AARectWhich::XZ => (Vec3::new(origin.x, origin.z, origin.y), Vec3::new(direction.x, direction.z, direction.y)),
+            AARectWhich::YZ => (Vec3::new(origin.y, origin.z, origin.x), Vec3::new(direction.y, direction.z, direction.x)),
+        };
+
+        // Calculate ray/plane intersect and bail if it is outside the required t range
+        let t = (self.c - origin.z) / direction.z;
+        if t < t_min || t > t_max {
+            return HitResult::Miss;
+        }
+
+        // Determine where in the plane the intersection is and bail if it is outside the rectangle
+        let x = origin.x + t * direction.x;
+        let y = origin.y + t * direction.y;
+        if x < self.a_min || x > self.a_max ||
+           y < self.b_min || y > self.b_max {
+            return HitResult::Miss;
+        }
+
+        let p = ray.at_t(t);
+        let normal = Vec3::new(0.0, 0.0, if self.negate_normal { -1.0 } else { 1.0 });
+        HitResult::Hit(HitRecord { t, p, normal, material: &*self.material })
+    }
+}
+
 pub struct Clump {
     pub bounds: Bounds,
     pub objects: Vec<Sphere>,

@@ -128,7 +128,6 @@ fn random_scene() -> Vec<Box<Hitable>> {
     objects.push(Box::new(clump_d));
 
     // let reddish = Box::new(Lambertian { albedo: Box::new(ConstantTexture { colour: Vec3::new(0.7, 0.2, 0.3) }) });
-    // let brushed_gold = Box::new(Metal { albedo: Vec3::new(0.8, 0.6, 0.2), fuzz: 0.3 });
     let gold = Box::new(Metal { albedo: Vec3::new(0.8, 0.6, 0.2), fuzz: 0.0 });
     let marble = Box::new(PolishedStone { albedo: Box::new(NoiseTexture::new(12.0, Vec3::new(0.6, 0.1, 0.2))) });
     let glass = Box::new(Dielectric { ref_index: 1.5 });
@@ -144,6 +143,9 @@ fn random_scene() -> Vec<Box<Hitable>> {
     // objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 0.0, -1.0), radius: 0.5, material: glass }));
     // objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 0.0, -1.0), radius: -0.45, material: glass2 }));
 
+    let brushed_gold = Box::new(Metal { albedo: Vec3::new(1.0, 0.85, 0.0), fuzz: 0.3 });
+    // let brushed_copper = Box::new(Metal { albedo: Vec3::new(0.7, 0.45, 0.2), fuzz: 0.3 });
+    objects.push(Box::new(AARect { which: AARectWhich::XY, a_min: -4.0, a_max: 4.0, b_min: -4.0, b_max: 1.3, c: -1.7, negate_normal: false, material: brushed_gold}));
     objects
 }
 
@@ -171,9 +173,9 @@ fn clamp(mut x: f32, min: f32, max: f32) -> f32 {
 }
 
 fn main() {
-    const COLS: usize = 1500;
-    const ROWS: usize = 1500;
-    const NUM_SAMPLES: usize = 200; // Sample code recommends 100 but this is slow
+    const COLS: usize = 800;
+    const ROWS: usize = 800;
+    const NUM_SAMPLES: usize = 100; // Sample code recommends 100 but this is slow
     const MAX_BOUNCES: usize = 30;
 
     println!("Hello, world!");
