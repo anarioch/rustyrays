@@ -1,6 +1,59 @@
 
 use super::math::*;
 
+use std::cmp::Ordering;
+use rand;
+use rand::Rng;
+
+/// Axis Aligned Bounding Box
+pub struct AABB {
+    pub min: Vec3,
+    pub max: Vec3,
+}
+
+impl AABB {
+    pub fn hit(&self, ray: &Ray, t_min: f32, t_max: f32) -> bool {
+        let inv_d = ray.direction.map(|x| 1.0 / x);
+        let t0 = (self.min - ray.origin).mul_vec(inv_d);
+        let t1 = (self.max - ray.origin).mul_vec(inv_d);
+
+        let (xt0,xt1) = if inv_d.x < 0.0 { (t1.x,t0.x) } else { (t0.x,t1.x) };
+        let t_min = t_min.max(xt0);
+        let t_max = t_max.min(xt1);
+        if t_max <= t_min {
+            return false;
+        }
+
+        let (yt0,yt1) = if inv_d.y < 0.0 { (t1.y,t0.y) } else { (t0.y,t1.y) };
+        let t_min = t_min.max(yt0);
+        let t_max = t_max.min(yt1);
+        if t_max <= t_min {
+            return false;
+        }
+
+        let (zt0,zt1) = if inv_d.z < 0.0 { (t1.z,t0.z) } else { (t0.z,t1.z) };
+        let t_min = t_min.max(zt0);
+        let t_max = t_max.min(zt1);
+        if t_max <= t_min {
+            return false;
+        }
+
+        true
+    }
+
+    pub fn union(&self, other: &AABB) -> AABB {
+        AABB {
+            min: self.min.min_vec(other.min),
+            max: self.max.max_vec(other.max),
+        }
+    }
+
+    pub fn union_assign(&mut self, other: &AABB) {
+        self.min = self.min.min_vec(other.min);
+        self.max = self.max.max_vec(other.max);
+    }
+}
+
 /// A record of where a ray hit an object, including a reference to the material
 pub struct HitRecord<'a> {
     pub t: f32,
@@ -16,6 +69,7 @@ pub enum HitResult<'a> {
 
 pub trait Hitable {
     fn hit<'a>(&'a self, ray: &Ray, t_min: f32, t_max: f32) -> HitResult<'a>;
+    fn bounds(&self) -> Option<AABB>;
 }
 
 pub struct ScatterResult {
@@ -38,11 +92,6 @@ impl Material for Invisible {
     fn scatter(&self, _ray: &Ray, _hit: &HitRecord) -> Option<ScatterResult>{
         None
     }
-}
-
-pub struct Bounds {
-    pub centre: Vec3,
-    pub radius: f32,
 }
 
 pub struct Sphere {
@@ -85,6 +134,10 @@ impl Hitable for Sphere {
             },
             None => HitResult::Miss,
         }
+    }
+    fn bounds(&self) -> Option<AABB> {
+        let rad = Vec3::new(self.radius, self.radius, self.radius);
+        Some(AABB { min: self.centre - rad, max: self.centre + rad })
     }
 }
 
@@ -133,19 +186,58 @@ impl Hitable for AARect {
         let normal = Vec3::new(0.0, 0.0, if self.negate_normal { -1.0 } else { 1.0 });
         HitResult::Hit(HitRecord { t, p, normal, material: &*self.material })
     }
+    fn bounds(&self) -> Option<AABB> {
+        const FUDGE: f32 = 0.005; // Give the infinitesimal plane a pretend width for bounds calculations
+        match self.which {
+            AARectWhich::XY => Some(AABB { min: Vec3::new(self.a_min, self.b_min, self.c - FUDGE), max: Vec3::new(self.a_max, self.b_max, self.c + FUDGE) }),
+            AARectWhich::XZ => Some(AABB { min: Vec3::new(self.a_min, self.c - FUDGE, self.b_min), max: Vec3::new(self.a_max, self.c + FUDGE, self.b_max) }),
+            AARectWhich::YZ => Some(AABB { min: Vec3::new(self.c - FUDGE, self.a_min, self.b_min), max: Vec3::new(self.c + FUDGE, self.a_max, self.b_max) }),
+        }
+    }
 }
 
 pub struct Clump {
-    pub bounds: Bounds,
+    pub bounds: Option<AABB>,
     pub objects: Vec<Sphere>,
+}
+
+impl Clump {
+    pub fn new(objects: Vec<Sphere>) -> Clump {
+        let bounds = Self::compute_bounds(&objects);
+        Clump { bounds, objects }
+    }
+    fn compute_bounds( objects: &[Sphere]) -> Option<AABB> {
+        let mut iter = objects.iter();
+
+        let first = match iter.next() {
+            None => return None,
+            Some(obj) => obj,
+        };
+        let mut bounds = match first.bounds() {
+            None => return None,
+            Some(aabb) => aabb,
+        };
+
+        for obj in iter {
+            match obj.bounds() {
+                None => return None,
+                Some(aabb) => bounds.union_assign(&aabb),
+            };
+            
+        }
+
+        Some(bounds)
+    }
 }
 
 impl Hitable for Clump {
     fn hit<'a>(&'a self, ray: &Ray, t_min: f32, t_max: f32) -> HitResult<'a> {
         // Bounds check for the clump
         // Note the full t range; otherwise the segment is inside completely
-        if let None = sphere_ray_intersect(&ray, 0.001, 1000.0, self.bounds.centre, self.bounds.radius) {
-            return HitResult::Miss;
+        if let Some(ref b) = self.bounds {
+            if !b.hit(&ray, t_min, t_max) {
+                return HitResult::Miss;
+            }
         }
 
         // Check each contained object
@@ -159,6 +251,112 @@ impl Hitable for Clump {
         }
 
         result
+    }
+    fn bounds(&self) -> Option<AABB> {
+        match self.bounds {
+            None => None,
+            Some(ref b) => Some(AABB { min: b.min, max: b.max }),
+        }
+    }
+}
+
+/// A Node in a Bounding Volume Hierarchy.
+/// This is a binary tree that ultimately contains a Hitable
+pub enum BVH<'a> {
+    Node { bounds: AABB, left: Box<BVH<'a>>, right: Box<BVH<'a>> },
+    Leaf { bounds: AABB, object: &'a Box<Hitable> },
+}
+
+impl<'a> BVH<'a> {
+    fn compare_x_min(a: &Box<Hitable>, b: &Box<Hitable>) -> Ordering {
+        let a_val: f32 = a.bounds().unwrap().min.x;
+        let b_val: f32 = b.bounds().unwrap().min.x;
+        a_val.partial_cmp(&b_val).unwrap()
+    }
+    fn _compare_y_min(a: &Box<Hitable>, b: &Box<Hitable>) -> Ordering {
+        let a_val: f32 = a.bounds().unwrap().min.y;
+        let b_val: f32 = b.bounds().unwrap().min.y;
+        a_val.partial_cmp(&b_val).unwrap()
+    }
+    fn compare_z_min(a: &Box<Hitable>, b: &Box<Hitable>) -> Ordering {
+        let a_val: f32 = a.bounds().unwrap().min.z;
+        let b_val: f32 = b.bounds().unwrap().min.z;
+        a_val.partial_cmp(&b_val).unwrap()
+    }
+    // TODO: Return Result<BVH,String>
+    pub fn build<'b>(objects: &'b mut [Box<Hitable>]) -> BVH {
+        // Base case of recursion
+        let num_objects = objects.len();
+        if num_objects == 1 {
+            let obj = &objects[0];
+            let bounds = obj.bounds().expect("BVH can only hold objects with finite bounds");
+            return BVH::Leaf { bounds, object: obj };
+        }
+
+        // Choose a random axis, sort objects
+        // Note that we assume objects to be mainly spread around the XZ plane
+        match rand::thread_rng().gen_range(0,2) {
+            0 => objects.sort_unstable_by(Self::compare_x_min),
+            1 => objects.sort_unstable_by(Self::compare_z_min),
+            // 2 => objects.sort_unstable_by(Self::compare_y_min),
+            _ => panic!("Unexpected random number encountered"),
+        };
+
+        // Partition the slice into two lists
+        let (left,right) = objects.split_at_mut(num_objects / 2);
+        let left = Self::build(left);
+        let right = Self::build(right);
+        let bounds = left.bounds().union(right.bounds());
+        BVH::Node { bounds, left: Box::new(left), right: Box::new(right) }
+    }
+
+    pub fn glue(bvh: BVH<'a>, object: &'a Box<Hitable>) -> BVH<'a> {
+        let left = BVH::Leaf { bounds: object.bounds().unwrap(), object };
+        let right = bvh;
+        let bounds = left.bounds().union(right.bounds());
+        BVH::Node { bounds, left: Box::new(left), right: Box::new(right) }
+    }
+
+    fn bounds(&self) -> &AABB {
+        match self {
+            BVH::Node{bounds, ..} => bounds,
+            BVH::Leaf{bounds, ..} => bounds,
+        }
+    }
+
+    pub fn hit(&'a self, ray: &Ray, t_min: f32, t_max: f32) -> HitResult<'a> {
+        // Bounds check for the clump
+        // Note the full t range; otherwise the segment is inside completely
+        if !self.bounds().hit(&ray, t_min, t_max) {
+            return HitResult::Miss;
+        };
+
+        // Thunk to contained object for leaf, and extract subtrees for nodes
+        let (left, right) = match self {
+            BVH::Leaf{object, ..} => return object.hit(&ray, t_min, t_max),
+            BVH::Node{ref left, ref right, ..} => (left, right),
+        };
+
+        // Check ray against each subtree
+        let left_result = left.hit(&ray, t_min, t_max);
+        let right_result = right.hit(&ray, t_min, t_max);
+
+        // Tricky logic to return if either or both result is a miss
+        let left_t = match left_result {
+            HitResult::Miss => return right_result,
+            HitResult::Hit(ref r) => r.t,
+        };
+        let right_t = match right_result {
+            HitResult::Miss => return left_result,
+            HitResult::Hit(ref r) => r.t,
+        };
+        // If both are hits then return the closest
+        if left_t < right_t {
+            left_result
+        }
+        else {
+            right_result
+        }
     }
 }
 

@@ -28,6 +28,14 @@ impl Vec3 {
         Vec3 { x: self.x * other.x, y: self.y * other.y, z: self.z * other.z }
     }
 
+    pub fn min_vec(&self, other: Vec3) -> Vec3 {
+        Vec3 { x: self.x.min(other.x), y: self.y.min(other.y), z: self.z.min(other.z) }
+    }
+
+    pub fn max_vec(&self, other: Vec3) -> Vec3 {
+        Vec3 { x: self.x.max(other.x), y: self.y.max(other.y), z: self.z.max(other.z) }
+    }
+
     pub fn len_sq(&self) -> f32 {
         dot(*self, *self)
     }

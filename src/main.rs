@@ -11,7 +11,6 @@ use rand::Rng;
 use raytrace::math;
 use raytrace::math::*;
 use raytrace::ppm::PpmImage;
-use raytrace::geometry;
 use raytrace::geometry::*;
 use raytrace::geometry::HitResult::{Hit,Miss};
 use raytrace::materials::*;
@@ -23,7 +22,7 @@ struct Camera {
     eye : Vec3,
     u: Vec3,
     v: Vec3,
-    w: Vec3,
+    _w: Vec3,
     lens_radius: f32,
 }
 
@@ -46,7 +45,7 @@ impl Camera {
         let horizontal = u*(2.0 * focus_dist*half_width);
         let vertical = v*(2.0 * focus_dist*half_height);
 
-        Camera { lower_left, horizontal, vertical, eye, u, v, w, lens_radius }
+        Camera { lower_left, horizontal, vertical, eye, u, v, _w: w, lens_radius }
     }
 
     fn clip_to_ray(&self, u: f32, v: f32) -> Ray {
@@ -93,39 +92,11 @@ fn random_scene() -> Vec<Box<Hitable>> {
         Sphere { centre, radius, material }
     };
 
-    let check_spheres = |clump: &Clump| {
-        for sphere in clump.objects.iter() {
-            let dist = (sphere.centre - clump.bounds.centre).len_sq().sqrt();
-            if dist + sphere.radius > clump.bounds.radius {
-                panic!("Sphere is outside!");
-            }
+    for a in -7..7 {
+        for b in -7..7 {
+            objects.push(Box::new(random_sphere(a as f32, b as f32)));
         }
-    };
-    // Randomise a bunch of spheres, putting them into a quadrant of clumps to optimise ray lookup
-    let mut clump_a = Clump { bounds: Bounds { centre: Vec3::new(-3.5, 0.2, -3.5), radius: 1.5 * 3.5}, objects: Vec::new() };
-    let mut clump_b = Clump { bounds: Bounds { centre: Vec3::new(-3.5, 0.2, 3.5), radius: 1.5 * 3.5}, objects: Vec::new() };
-    let mut clump_c = Clump { bounds: Bounds { centre: Vec3::new(3.5, 0.2, -3.5), radius: 1.5 * 32.5}, objects: Vec::new() };
-    let mut clump_d = Clump { bounds: Bounds { centre: Vec3::new(3.5, 0.2, 3.5), radius: 1.5 * 3.5}, objects: Vec::new() };
-    for a in -7..0 { for b in -7..0 {
-        clump_a.objects.push(random_sphere(a as f32, b as f32));
-    } }
-    for a in -7..0 { for b in 0..7 {
-        clump_b.objects.push(random_sphere(a as f32, b as f32));
-    } }
-    for a in 0..7 { for b in -7..0 {
-        clump_c.objects.push(random_sphere(a as f32, b as f32));
-    } }
-    for a in 0..7 { for b in 0..7 {
-        clump_d.objects.push(random_sphere(a as f32, b as f32));
-    } }
-    check_spheres(&clump_a);
-    check_spheres(&clump_b);
-    check_spheres(&clump_c);
-    check_spheres(&clump_d);
-    objects.push(Box::new(clump_a));
-    objects.push(Box::new(clump_b));
-    objects.push(Box::new(clump_c));
-    objects.push(Box::new(clump_d));
+    }
 
     // let reddish = Box::new(Lambertian { albedo: Box::new(ConstantTexture { colour: Vec3::new(0.7, 0.2, 0.3) }) });
     let gold = Box::new(Metal { albedo: Vec3::new(0.8, 0.6, 0.2), fuzz: 0.0 });
@@ -146,6 +117,7 @@ fn random_scene() -> Vec<Box<Hitable>> {
     let brushed_gold = Box::new(Metal { albedo: Vec3::new(1.0, 0.85, 0.0), fuzz: 0.3 });
     // let brushed_copper = Box::new(Metal { albedo: Vec3::new(0.7, 0.45, 0.2), fuzz: 0.3 });
     objects.push(Box::new(AARect { which: AARectWhich::XY, a_min: -4.0, a_max: 4.0, b_min: -4.0, b_max: 1.3, c: -1.7, negate_normal: false, material: brushed_gold}));
+
     objects
 }
 
@@ -173,8 +145,8 @@ fn clamp(mut x: f32, min: f32, max: f32) -> f32 {
 }
 
 fn main() {
-    const COLS: usize = 800;
-    const ROWS: usize = 800;
+    const COLS: usize = 200;
+    const ROWS: usize = 200;
     const NUM_SAMPLES: usize = 100; // Sample code recommends 100 but this is slow
     const MAX_BOUNCES: usize = 30;
 
@@ -199,10 +171,16 @@ fn main() {
 
     // Generate the scene
     let scene_index = 1;
-    let objects = match scene_index {
+    let mut objects = match scene_index {
         0 => noise_scene(),
         _ => random_scene(),
     };
+
+    // TODO: Split globe from rest of objects here; it ought to significantly improve AABB sizes
+    let obj_slice = &mut objects;
+    let (globe, obj_slice) = obj_slice.split_at_mut(1);
+    let bvh = BVH::build(obj_slice);
+    let bvh = BVH::glue(bvh, &globe[0]);
 
     // Cast rays to generate the image
     let mut image = PpmImage::create(COLS, ROWS);
@@ -217,7 +195,7 @@ fn main() {
                 let u = (pu + rng.gen::<f32>()) / COLS as f32;
                 let v = (pv + rng.gen::<f32>()) / ROWS as f32;
                 let ray = camera.clip_to_ray(u, v);
-                colour += ray_colour(&ray, &objects, MAX_BOUNCES);
+                colour += ray_colour(&ray, &bvh, MAX_BOUNCES);
             }
             colour *= 1.0 / NUM_SAMPLES as f32;
             // Clamp the colour to [0..1]
@@ -376,8 +354,8 @@ impl Material for DiffuseLight {
     }
 }
 
-fn ray_colour(ray: &Ray, objects: &Vec<Box<Hitable>>, depth: usize) -> Vec3 {
-    match geometry::hit(&ray, 0.001, 1000.0, &objects) {
+fn ray_colour(ray: &Ray, object: &BVH, depth: usize) -> Vec3 {
+    match object.hit(&ray, 0.001, 1000.0) {
         Hit(record) => {
             // (normal.normalise() + Vec3::new(1.0, 1.0, 1.0)) * 0.5 // Use this return value to visualise normals
             if depth == 0 {
@@ -386,7 +364,7 @@ fn ray_colour(ray: &Ray, objects: &Vec<Box<Hitable>>, depth: usize) -> Vec3 {
             let emission = record.material.emit();
             match record.material.scatter(&ray, &record) {
                 Some(scatter) => {
-                    let recurse = ray_colour(&scatter.scattered, &objects, depth - 1);
+                    let recurse = ray_colour(&scatter.scattered, &object, depth - 1);
                     emission + scatter.attenuation.mul_vec(recurse)
                 },
                 None => emission
