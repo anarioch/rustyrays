@@ -1,5 +1,11 @@
 use std::ops::{Add,AddAssign,Sub,Mul,MulAssign,Neg};
 
+use rand::{ThreadRng,Rng};
+
+fn rand_f32(rng: &mut ThreadRng) -> f32 {
+    rng.gen::<f32>()
+}
+
 #[derive(PartialEq,Debug,Clone,Copy)]
 pub struct Vec3 {
     pub x: f32,
@@ -50,6 +56,22 @@ impl Vec3 {
     // pub fn length(&self) -> f32 {
     //     dot(self, self).sqrt()
     // }
+
+    pub fn random_in_unit_sphere(rng: &mut ThreadRng) -> Vec3 {
+        let mut p = Vec3::new(2.0, 2.0, 2.0);
+        while p.len_sq() >= 1.0 {
+            p.set(2.0 * rand_f32(rng) - 1.0, 2.0 * rand_f32(rng) - 1.0, 2.0 * rand_f32(rng) - 1.0);
+        }
+        p
+    }
+
+    pub fn random_in_unit_disk(rng: &mut ThreadRng) -> Vec3 {
+        let mut p = Vec3::new(2.0, 2.0, 2.0);
+        while p.len_sq() >= 1.0 {
+            p.set(2.0 * rand_f32(rng) - 1.0, 2.0 * rand_f32(rng) - 1.0, 0.0);
+        }
+        p
+    }
 }
 
 impl Add for Vec3 {

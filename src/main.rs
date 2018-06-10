@@ -8,7 +8,6 @@ use std::path::Path;
 
 use rand::Rng;
 
-use raytrace::math;
 use raytrace::math::*;
 use raytrace::ppm::PpmImage;
 use raytrace::geometry::*;
@@ -52,7 +51,7 @@ impl Camera {
         // // Basic projection
         // Ray::new(self.eye, self.lower_left + self.horizontal * u + self.vertical * v - self.eye)
         // Add noise to eye location to achieve depth-if-field
-        let rd = random_in_unit_disk() * self.lens_radius;
+        let rd = Vec3::random_in_unit_disk(&mut rand::thread_rng()) * self.lens_radius;
         let offset = self.u * rd.x + self.v * rd.y;
         let eye = self.eye + offset;
         Ray::new(eye, self.lower_left + self.horizontal * u + self.vertical * v - eye)
@@ -75,7 +74,7 @@ fn random_scene() -> Vec<Box<Hitable>> {
     objects.push(Box::new(Sphere {
         centre: world_centre,
         radius: world_radius,
-        material: Box::new(Lambertian { albedo: Box::new(globe_texture) }),
+        material: Box::new(TexturedLambertian { albedo: Box::new(globe_texture) }),
     }));
 
     // Create closure that creates a randomised sphere within the x,z unit cell
@@ -85,7 +84,7 @@ fn random_scene() -> Vec<Box<Hitable>> {
         let mut centre = Vec3::new(x + 0.9 * rand(), 0.0, z + 0.9 * rand());
         centre.y = (rad_sq - centre.x * centre.x).sqrt() - world_radius + radius;
         let material: Box<Material> = match rand() {
-            d if d < 0.65 => Box::new(Lambertian { albedo: Box::new(ConstantTexture { colour: Vec3::new(rand() * rand(), rand() * rand(), rand() * rand()) }) }),
+            d if d < 0.65 => Box::new(Lambertian { albedo: Vec3::new(rand() * rand(), rand() * rand(), rand() * rand()) }),
             d if d < 0.85 => Box::new(Metal { albedo: Vec3::new(0.5 * (1.0 + rand()), 0.5 * (1.0 + rand()), 0.5 * (1.0 + rand())), fuzz: 0.5 * rand() }),
             _ => Box::new(Dielectric { ref_index: 1.5 }),
         };
@@ -125,7 +124,7 @@ fn noise_scene() -> Vec<Box<Hitable>> {
     let mut objects : Vec<Box<Hitable>> = Vec::new();
 
     // The giant world sphere on which all others sit
-    let noise1 = Box::new(Lambertian { albedo: Box::new(NoiseTexture::new(4.0, Vec3::new(1.0, 1.0, 1.0))) });
+    let noise1 = Box::new(TexturedLambertian { albedo: Box::new(NoiseTexture::new(4.0, Vec3::new(1.0, 1.0, 1.0))) });
     objects.push(Box::new(Sphere {
         centre: Vec3::new(0.0, -1000.5, -2.0),
         radius: 1000.0,
@@ -219,139 +218,6 @@ fn main() {
     // Output the image to a file
     let path = Path::new("out/output.ppm");
     write_text_to_file(&image.get_text(), &path);
-}
-
-fn random_in_unit_sphere() -> Vec3 {
-    let mut p = Vec3::new(2.0, 2.0, 2.0);
-    let mut rng = rand::thread_rng();
-    let mut rand = || rng.gen::<f32>();
-    while p.len_sq() >= 1.0 {
-        p.set(2.0 * rand() - 1.0, 2.0 * rand() - 1.0, 2.0 * rand() - 1.0);
-    }
-    p
-}
-
-fn random_in_unit_disk() -> Vec3 {
-    let mut p = Vec3::new(2.0, 2.0, 2.0);
-    let mut rng = rand::thread_rng();
-    let mut rand = || rng.gen::<f32>();
-    while p.len_sq() >= 1.0 {
-        p.set(2.0 * rand() - 1.0, 2.0 * rand() - 1.0, 0.0);
-    }
-    p
-}
-
-struct Lambertian {
-    albedo: Box<Texture>,
-}
-
-impl Material for Lambertian {
-    fn scatter(&self, _ray: &Ray, hit: &HitRecord) -> Option<ScatterResult> {
-        let target = hit.p + hit.normal + random_in_unit_sphere();
-        let dir = target - hit.p;
-        let attenuation = self.albedo.value(0.0, 0.0, hit.p);
-        let scattered = Ray { origin: hit.p, direction: dir };
-        Some(ScatterResult { attenuation, scattered})
-    }
-}
-
-struct Metal {
-    albedo: Vec3,
-    fuzz: f32,
-}
-
-impl Material for Metal {
-    fn scatter(&self, ray: &Ray, hit: &HitRecord) -> Option<ScatterResult> {
-        let reflected = math::reflect(ray.direction.normalise(), hit.normal);
-        let reflected = reflected + self.fuzz * random_in_unit_sphere();
-        if dot(reflected, hit.normal) > 0.0 {
-            let scattered = Ray { origin: hit.p, direction: reflected };
-            Some(ScatterResult { attenuation: self.albedo, scattered})
-        }
-        else {
-            None
-        }
-    }
-}
-
-struct PolishedStone {
-    albedo: Box<Texture>,
-}
-
-impl Material for PolishedStone {
-    fn scatter(&self, ray: &Ray, hit: &HitRecord) -> Option<ScatterResult> {
-        let reflected = math::reflect(ray.direction.normalise(), hit.normal);
-        let dotty = dot(reflected, hit.normal);
-        let reflect_prob = 1.0 - dotty.sqrt();
-        let (attenuation, direction) = if rand::thread_rng().gen::<f32>() < reflect_prob {
-            (Vec3::new(1.0, 1.0, 1.0), reflected)
-        }
-        else {
-            let attenuation = self.albedo.value(0.0, 0.0, hit.p);
-            let scattered = hit.normal + random_in_unit_sphere();
-            (attenuation, scattered)
-        };
-        let scattered = Ray { origin: hit.p, direction };
-        Some(ScatterResult { attenuation, scattered})
-    }
-}
-
-struct Dielectric {
-    ref_index: f32,
-}
-
-fn schlick(cosine: f32, ref_index: f32) -> f32 {
-    let r0 = (1.0 - ref_index) / (1.0 + ref_index);
-    let r0 = r0 * r0;
-    r0 + (1.0 - r0) * (1.0 - cosine).powi(5)
-}
-
-impl Material for Dielectric {
-    fn scatter(&self, ray: &Ray, hit: &HitRecord) -> Option<ScatterResult> {
-        let dir = ray.direction.normalise();
-        let reflected = math::reflect(dir, hit.normal);
-        let attenuation = Vec3::new(1.0, 1.0, 1.0);
-
-        let ray_dot_norm = dot(ray.direction, hit.normal);
-        let cosine = ray_dot_norm / ray.direction.len_sq().sqrt();
-        let (outward_normal, ni_over_nt, cosine) =
-            if ray_dot_norm > 0.0 {
-                (-hit.normal, self.ref_index, self.ref_index * cosine)
-            }
-            else {
-                (hit.normal, 1.0 / self.ref_index, -cosine)
-            };
-        
-        let (refracted, reflect_prob) =
-            match math::refract(dir, outward_normal, ni_over_nt) {
-                Some(refracted) => {
-                    (refracted, schlick(cosine, self.ref_index))
-                },
-                None => (Vec3::new(0.0, 0.0, 0.0), 1.0)
-            };
-        let ray_dir = 
-            if rand::thread_rng().gen::<f32>() < reflect_prob {
-                reflected
-            }
-            else {
-                refracted
-            };
-        let scattered = Ray { origin: hit.p, direction: ray_dir };
-        Some(ScatterResult { attenuation, scattered })
-    }
-}
-
-pub struct DiffuseLight {
-    emission_colour: Vec3,
-}
-
-impl Material for DiffuseLight {
-    fn scatter(&self, _ray: &Ray, _hit: &HitRecord) -> Option<ScatterResult> {
-        None
-    }
-    fn emit(&self) -> Vec3 {
-        self.emission_colour
-    }
 }
 
 fn ray_colour(ray: &Ray, object: &BVH, depth: usize) -> Vec3 {

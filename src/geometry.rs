@@ -1,5 +1,6 @@
 
 use super::math::*;
+use super::materials::Material;
 
 use std::cmp::Ordering;
 use rand;
@@ -70,28 +71,6 @@ pub enum HitResult<'a> {
 pub trait Hitable {
     fn hit<'a>(&'a self, ray: &Ray, t_min: f32, t_max: f32) -> HitResult<'a>;
     fn bounds(&self) -> Option<AABB>;
-}
-
-pub struct ScatterResult {
-    pub attenuation: Vec3,
-    pub scattered: Ray,
-}
-
-pub trait Material {
-    fn scatter(&self, ray: &Ray, hit: &HitRecord) -> Option<ScatterResult>;
-    fn emit(&self) -> Vec3 {
-        Vec3::new(0.0, 0.0, 0.0)
-    }
-}
-
-pub struct Invisible {
-    // Nothing here
-}
-
-impl Material for Invisible {
-    fn scatter(&self, _ray: &Ray, _hit: &HitRecord) -> Option<ScatterResult>{
-        None
-    }
 }
 
 pub struct Sphere {
