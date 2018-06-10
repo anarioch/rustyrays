@@ -144,8 +144,8 @@ fn clamp(mut x: f32, min: f32, max: f32) -> f32 {
 }
 
 fn main() {
-    const COLS: usize = 200;
-    const ROWS: usize = 200;
+    const COLS: usize = 400;
+    const ROWS: usize = 400;
     const NUM_SAMPLES: usize = 100; // Sample code recommends 100 but this is slow
     const MAX_BOUNCES: usize = 30;
 
@@ -161,8 +161,10 @@ fn main() {
     let dist_to_focus = (focus - eye).len_sq().sqrt();
     let camera = Camera::new(eye, focus, up, FIELD_OF_VIEW, ASPECT_RATIO, APERTURE, dist_to_focus);
 
+    // Set up variables for timing and progress printing
     let max_iterations = COLS * ROWS;
     let mut num_iterations = 0;
+    let start_time = std::time::Instant::now();
     let mut last_time = std::time::Instant::now();
     print!("Processing...");
     let io_flush = || std::io::stdout().flush().ok().expect("Could not flush stdout");
@@ -175,11 +177,19 @@ fn main() {
         _ => random_scene(),
     };
 
-    // TODO: Split globe from rest of objects here; it ought to significantly improve AABB sizes
+    // Split outliers from rest of objects here to improve AABB sizes
+    // TODO Figure out better heuristics to this automatically
     let obj_slice = &mut objects;
+    let n_objects = obj_slice.len();
+    let (obj_slice, outliers) = obj_slice.split_at_mut(n_objects-2);
     let (globe, obj_slice) = obj_slice.split_at_mut(1);
     let bvh = BVH::build(obj_slice);
+    let bvh = BVH::glue(bvh, &outliers[0]);
+    let bvh = BVH::glue(bvh, &outliers[1]);
     let bvh = BVH::glue(bvh, &globe[0]);
+
+    println!("Scene generation done (Took {:.2}s)", start_time.elapsed().as_secs());
+    let post_scene_gen_time = std::time::Instant::now();
 
     // Cast rays to generate the image
     let mut image = PpmImage::create(COLS, ROWS);
@@ -194,7 +204,7 @@ fn main() {
                 let u = (pu + rng.gen::<f32>()) / COLS as f32;
                 let v = (pv + rng.gen::<f32>()) / ROWS as f32;
                 let ray = camera.clip_to_ray(u, v);
-                colour += ray_colour(&ray, &bvh, MAX_BOUNCES);
+                colour += cast_ray(&ray, &bvh, MAX_BOUNCES);
             }
             colour *= 1.0 / NUM_SAMPLES as f32;
             // Clamp the colour to [0..1]
@@ -213,14 +223,17 @@ fn main() {
         }
     }
 
-    println!("\rProcessing done, writing file");
+    println!("\rProcessing done (Took {:.2}s)", post_scene_gen_time.elapsed().as_secs());
+    println!("Writing file..");
 
     // Output the image to a file
     let path = Path::new("out/output.ppm");
     write_text_to_file(&image.get_text(), &path);
 }
 
-fn ray_colour(ray: &Ray, object: &BVH, depth: usize) -> Vec3 {
+/// Cast a ray into the scene represented by the spatial lookup, returning a colour
+/// Depth should decrease by one for each bounced ray, terminating recursion onces it reaches zero
+fn cast_ray(ray: &Ray, object: &BVH, depth: usize) -> Vec3 {
     match object.hit(&ray, 0.001, 1000.0) {
         Hit(record) => {
             // (normal.normalise() + Vec3::new(1.0, 1.0, 1.0)) * 0.5 // Use this return value to visualise normals
@@ -230,7 +243,7 @@ fn ray_colour(ray: &Ray, object: &BVH, depth: usize) -> Vec3 {
             let emission = record.material.emit();
             match record.material.scatter(&ray, &record) {
                 Some(scatter) => {
-                    let recurse = ray_colour(&scatter.scattered, &object, depth - 1);
+                    let recurse = cast_ray(&scatter.scattered, &object, depth - 1);
                     emission + scatter.attenuation.mul_vec(recurse)
                 },
                 None => emission
