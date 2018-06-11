@@ -66,9 +66,10 @@ fn turb(noise: &Perlin, p: Vec3, depth: usize) -> f32 {
 
 impl Texture for NoiseTexture {
     fn value(&self, _u: f32, _v: f32, p: Vec3) -> Vec3 {
+        const NUM_FREQUENCIES: usize = 7;
 
         // let noise = self.perlin.get([p.x as f64, p.y as f64, p.z as f64]);
-        let noise = turb(&self.perlin, p, 7);
+        let noise = turb(&self.perlin, p, NUM_FREQUENCIES);
         // self.colour * 0.5 * (1.0 + noise as f32)
         self.colour * 0.5 * (1.0 + (self.scale * p.z + 10.0 * noise).sin())
     }
@@ -224,3 +225,130 @@ impl Material for DiffuseLight {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::super::math::*;
+    use super::super::geometry::HitRecord;
+    use super::*;
+
+    use test::Bencher;
+
+    #[test]
+    fn scatter_lambertian() {
+        // Given:
+        let material = Lambertian { albedo: Vec3::new(1.0, 0.0, 0.0) };
+        let ray = Ray { origin: Vec3::new(1.0, 1.0, 0.0), direction: Vec3::new(-1.0, 0.0, 0.0) };
+        let hit = HitRecord { t: 0.5, p: Vec3::new(0.0, 1.0, 1.0), normal: Vec3::new(0.0, 1.0, 0.0), material: &material };
+
+        // When: We scatter off the material
+        let res = material.scatter(&ray, &hit);
+
+        // Then: the result is not None
+        let res = res.unwrap();
+
+        // Then: the attenuation is the red that we defined on the material
+        assert_eq!(res.attenuation, material.albedo);
+    }
+
+    #[test]
+    fn scatter_metal() {
+        // Given:
+        let material = Metal { albedo: Vec3::new(1.0, 0.0, 0.0), fuzz: 0.0 };
+        let ray = Ray { origin: Vec3::new(-1.0, 2.0, 0.0), direction: Vec3::new(1.0, -1.0, 0.0) };
+        let hit = HitRecord { t: 0.5, p: Vec3::new(0.0, 1.0, 1.0), normal: Vec3::new(0.0, 1.0, 0.0), material: &material };
+
+        // When: We scatter off the material
+        let res = material.scatter(&ray, &hit);
+
+        // Then: the result is not None
+        let res = res.unwrap();
+
+        // Then: the attenuation is the red that we defined on the material
+        assert_eq!(res.attenuation, material.albedo);
+        assert_eq!(res.scattered.origin, hit.p);
+        assert_eq!(res.scattered.direction, Vec3::new(1.0, 1.0, 0.0) * (1.0 / f32::sqrt(2.0)));
+    }
+
+    #[test]
+    fn scatter_dielectric() {
+        // Given:
+        let material = Dielectric { ref_index: 1.5 };
+        let ray = Ray { origin: Vec3::new(-1.0, 2.0, 0.0), direction: Vec3::new(1.0, -1.0, 0.0) };
+        let hit = HitRecord { t: 0.5, p: Vec3::new(0.0, 1.0, 1.0), normal: Vec3::new(0.0, 1.0, 0.0), material: &material };
+
+        // When: We scatter off the material
+        let res = material.scatter(&ray, &hit);
+
+        // Then: the result is not None
+        let res = res.unwrap();
+
+        // Then: the attenuation is the red that we defined on the material
+        assert_eq!(res.attenuation, Vec3::new(1.0, 1.0, 1.0));
+        assert_eq!(res.scattered.origin, hit.p);
+        assert_eq!(res.scattered.direction, Vec3::new(0.47140455, -0.8819171, 0.0));
+    }
+
+    #[bench]
+    fn bench_noise_texture(b: &mut Bencher) {
+        // Optionally include some setup
+        let texture = NoiseTexture::new(2.0, Vec3::new(1.0, 0.0, 0.0));
+
+        b.iter(|| {
+            // Inner closure, the actual test
+            texture.value(0.0, 0.0, Vec3::new(0.0, 1.0, 1.0));
+        });
+    }
+
+    #[bench]
+    fn bench_lambertian(b: &mut Bencher) {
+        // Optionally include some setup
+        let material = Lambertian { albedo: Vec3::new(1.0, 0.0, 0.0) };
+        let ray = Ray { origin: Vec3::new(1.0, 1.0, 0.0), direction: Vec3::new(-1.0, 0.0, 0.0) };
+        let hit = HitRecord { t: 0.5, p: Vec3::new(0.0, 1.0, 1.0), normal: Vec3::new(0.0, 1.0, 0.0), material: &material };
+
+        b.iter(|| {
+            // Inner closure, the actual test
+            material.scatter(&ray, &hit).unwrap();
+        });
+    }
+
+    #[bench]
+    fn bench_textured_lambertian(b: &mut Bencher) {
+        // Optionally include some setup
+        let texture = ConstantTexture { colour: Vec3::new(1.0, 0.0, 0.0) };
+        let material = TexturedLambertian { albedo: Box::new(texture) };
+        let ray = Ray { origin: Vec3::new(1.0, 1.0, 0.0), direction: Vec3::new(-1.0, 0.0, 0.0) };
+        let hit = HitRecord { t: 0.5, p: Vec3::new(0.0, 1.0, 1.0), normal: Vec3::new(0.0, 1.0, 0.0), material: &material };
+
+        b.iter(|| {
+            // Inner closure, the actual test
+            material.scatter(&ray, &hit).unwrap();
+        });
+    }
+
+    #[bench]
+    fn bench_metal(b: &mut Bencher) {
+        // Optionally include some setup
+        let material = Metal { albedo: Vec3::new(1.0, 0.0, 0.0), fuzz: 0.0 };
+        let ray = Ray { origin: Vec3::new(-1.0, 2.0, 0.0), direction: Vec3::new(1.0, -1.0, 0.0) };
+        let hit = HitRecord { t: 0.5, p: Vec3::new(0.0, 1.0, 1.0), normal: Vec3::new(0.0, 1.0, 0.0), material: &material };
+
+        b.iter(|| {
+            // Inner closure, the actual test
+            material.scatter(&ray, &hit).unwrap();
+        });
+    }
+
+    #[bench]
+    fn bench_dielectric(b: &mut Bencher) {
+        // Optionally include some setup
+        let material = Dielectric { ref_index: 1.5 };
+        let ray = Ray { origin: Vec3::new(-1.0, 2.0, 0.0), direction: Vec3::new(1.0, -1.0, 0.0) };
+        let hit = HitRecord { t: 0.5, p: Vec3::new(0.0, 1.0, 1.0), normal: Vec3::new(0.0, 1.0, 0.0), material: &material };
+
+        b.iter(|| {
+            // Inner closure, the actual test
+            material.scatter(&ray, &hit).unwrap();
+        });
+    }
+}
