@@ -11,7 +11,6 @@ use rand::Rng;
 use raytrace::math::*;
 use raytrace::ppm::PpmImage;
 use raytrace::geometry::*;
-use raytrace::geometry::HitResult::{Hit,Miss};
 use raytrace::materials::*;
 
 struct Camera {
@@ -235,7 +234,7 @@ fn main() {
 /// Depth should decrease by one for each bounced ray, terminating recursion onces it reaches zero
 fn cast_ray(ray: &Ray, object: &BVH, depth: usize) -> Vec3 {
     match object.hit(&ray, 0.001, 1000.0) {
-        Hit(record) => {
+        Some(record) => {
             // (normal.normalise() + Vec3::new(1.0, 1.0, 1.0)) * 0.5 // Use this return value to visualise normals
             if depth == 0 {
                 return Vec3::new(0.0, 0.0, 0.0);
@@ -249,7 +248,7 @@ fn cast_ray(ray: &Ray, object: &BVH, depth: usize) -> Vec3 {
                 None => emission
             }
         },
-        Miss => {
+        None => {
             // Vec3::new(0.0, 0.0, 0.0)
             let unit = ray.direction.normalise();
             let t = 0.5 * (unit.y + 1.0);

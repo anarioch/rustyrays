@@ -63,13 +63,8 @@ pub struct HitRecord<'a> {
     pub material: &'a Material,
 }
 
-pub enum HitResult<'a> {
-    Miss,
-    Hit(HitRecord<'a>),
-}
-
 pub trait Hitable {
-    fn hit<'a>(&'a self, ray: &Ray, t_min: f32, t_max: f32) -> HitResult<'a>;
+    fn hit<'a>(&'a self, ray: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord<'a>>;
     fn bounds(&self) -> Option<AABB>;
 }
 
@@ -104,14 +99,14 @@ fn sphere_ray_intersect(ray: &Ray, t_min: f32, t_max: f32, centre: Vec3, radius:
 }
 
 impl Hitable for Sphere {
-    fn hit(&self, ray: &Ray, t_min: f32, t_max: f32) -> HitResult {
+    fn hit(&self, ray: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {
         match sphere_ray_intersect(&ray, t_min, t_max, self.centre, self.radius) {
             Some(t) => {
                 let p = ray.at_t(t);
                 let normal = (p - self.centre) * (1.0/self.radius);
-                HitResult::Hit(HitRecord { t, p, normal, material: &*self.material })
+                Some(HitRecord { t, p, normal, material: &*self.material })
             },
-            None => HitResult::Miss,
+            None => None,
         }
     }
     fn bounds(&self) -> Option<AABB> {
@@ -137,7 +132,7 @@ pub struct AARect {
 }
 
 impl Hitable for AARect {
-    fn hit(&self, ray: &Ray, t_min: f32, t_max: f32) -> HitResult {
+    fn hit(&self, ray: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {
         // Swizzle the inputs to match an XY plane layout
         let origin = ray.origin;
         let direction = ray.direction;
@@ -150,7 +145,7 @@ impl Hitable for AARect {
         // Calculate ray/plane intersect and bail if it is outside the required t range
         let t = (self.c - origin.z) / direction.z;
         if t < t_min || t > t_max {
-            return HitResult::Miss;
+            return None;
         }
 
         // Determine where in the plane the intersection is and bail if it is outside the rectangle
@@ -158,12 +153,12 @@ impl Hitable for AARect {
         let y = origin.y + t * direction.y;
         if x < self.a_min || x > self.a_max ||
            y < self.b_min || y > self.b_max {
-            return HitResult::Miss;
+            return None;
         }
 
         let p = ray.at_t(t);
         let normal = Vec3::new(0.0, 0.0, if self.negate_normal { -1.0 } else { 1.0 });
-        HitResult::Hit(HitRecord { t, p, normal, material: &*self.material })
+        Some(HitRecord { t, p, normal, material: &*self.material })
     }
     fn bounds(&self) -> Option<AABB> {
         const FUDGE: f32 = 0.005; // Give the infinitesimal plane a pretend width for bounds calculations
@@ -210,22 +205,22 @@ impl Clump {
 }
 
 impl Hitable for Clump {
-    fn hit<'a>(&'a self, ray: &Ray, t_min: f32, t_max: f32) -> HitResult<'a> {
+    fn hit<'a>(&'a self, ray: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {
         // Bounds check for the clump
         // Note the full t range; otherwise the segment is inside completely
         if let Some(ref b) = self.bounds {
             if !b.hit(&ray, t_min, t_max) {
-                return HitResult::Miss;
+                return None;
             }
         }
 
         // Check each contained object
-        let mut result = HitResult::Miss;
+        let mut result = None;
         let mut closest_so_far = t_max;
         for obj in &self.objects {
-            if let HitResult::Hit(record) = obj.hit(&ray, t_min, closest_so_far) {
+            if let Some(record) = obj.hit(&ray, t_min, closest_so_far) {
                 closest_so_far = record.t;
-                result = HitResult::Hit(record);
+                result = Some(record);
             };
         }
 
@@ -303,11 +298,11 @@ impl<'a> BVH<'a> {
         }
     }
 
-    pub fn hit(&'a self, ray: &Ray, t_min: f32, t_max: f32) -> HitResult<'a> {
+    pub fn hit(&'a self, ray: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord<'a>> {
         // Bounds check for the clump
         // Note the full t range; otherwise the segment is inside completely
         if !self.bounds().hit(&ray, t_min, t_max) {
-            return HitResult::Miss;
+            return None;
         };
 
         // Thunk to contained object for leaf, and extract subtrees for nodes
@@ -322,12 +317,12 @@ impl<'a> BVH<'a> {
 
         // Tricky logic to return if either or both result is a miss
         let left_t = match left_result {
-            HitResult::Miss => return right_result,
-            HitResult::Hit(ref r) => r.t,
+            None => return right_result,
+            Some(ref r) => r.t,
         };
         let right_t = match right_result {
-            HitResult::Miss => return left_result,
-            HitResult::Hit(ref r) => r.t,
+            None => return left_result,
+            Some(ref r) => r.t,
         };
         // If both are hits then return the closest
         if left_t < right_t {
@@ -339,7 +334,7 @@ impl<'a> BVH<'a> {
     }
 }
 
-pub fn hit<'a>(ray: &Ray, t_min: f32, t_max: f32, objects: &'a [Box<Hitable>]) -> HitResult<'a> {
+pub fn hit<'a>(ray: &Ray, t_min: f32, t_max: f32, objects: &'a [Box<Hitable>]) -> Option<HitRecord<'a>> {
     // // This algorithm seems like the more Rust-like way to do it.
     // // But because it doesn't get to prune future checks based on already seen objects, it is slower.
     // // Perhaps it would be better with multiple threads, or spatially grouped objects
@@ -351,12 +346,12 @@ pub fn hit<'a>(ray: &Ray, t_min: f32, t_max: f32, objects: &'a [Box<Hitable>]) -
     //     None => HitResult::Miss,
     // }
 
-    let mut result = HitResult::Miss;
+    let mut result = None;
     let mut closest_so_far = t_max;
     for obj in objects {
-        if let HitResult::Hit(record) = (*obj).hit(&ray, t_min, closest_so_far) {
+        if let Some(record) = (*obj).hit(&ray, t_min, closest_so_far) {
             closest_so_far = record.t;
-            result = HitResult::Hit(record);
+            result = Some(record);
         }
     }
 
@@ -366,8 +361,8 @@ pub fn hit<'a>(ray: &Ray, t_min: f32, t_max: f32, objects: &'a [Box<Hitable>]) -
 #[cfg(test)]
 mod tests {
     use super::super::math::*;
+    use super::super::materials::Invisible;
     use super::*;
-    use super::HitResult::*;
 
     #[test]
     fn hit_sphere_works() {
@@ -378,13 +373,13 @@ mod tests {
         // Expected hit: ray along y axis and sphere 2 units down y axis
         let sphere = Sphere { centre: Vec3::new(0.0, -2.0, 0.0), radius: 1.0, material: Box::new(Invisible {}) };
         match sphere.hit(&down_y, 0.0, 1000.0) {
-            Miss => panic!("This ray and sphere were supposed to hit"),
-            Hit(record) => assert_eq!(record.t, 1.0),
+            None => panic!("This ray and sphere were supposed to hit"),
+            Some(record) => assert_eq!(record.t, 1.0),
         };
         // Expected miss: ray parallel to y axis and sphere 2 units down y axis
         match sphere.hit(&down_y_parallel, 0.0, 1000.0) {
-            Miss => (),
-            Hit(_) => panic!("This ray and sphere were supposed to miss"),
+            None => (),
+            Some(_) => panic!("This ray and sphere were supposed to miss"),
         };
     }
 }
