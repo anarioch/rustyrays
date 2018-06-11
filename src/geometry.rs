@@ -222,7 +222,7 @@ impl Hitable for Clump {
         // Check each contained object
         let mut result = HitResult::Miss;
         let mut closest_so_far = t_max;
-        for obj in self.objects.iter() {
+        for obj in &self.objects {
             if let HitResult::Hit(record) = obj.hit(&ray, t_min, closest_so_far) {
                 closest_so_far = record.t;
                 result = HitResult::Hit(record);
@@ -339,7 +339,7 @@ impl<'a> BVH<'a> {
     }
 }
 
-pub fn hit<'a>(ray: &Ray, t_min: f32, t_max: f32, objects: &'a Vec<Box<Hitable>>) -> HitResult<'a> {
+pub fn hit<'a>(ray: &Ray, t_min: f32, t_max: f32, objects: &'a [Box<Hitable>]) -> HitResult<'a> {
     // // This algorithm seems like the more Rust-like way to do it.
     // // But because it doesn't get to prune future checks based on already seen objects, it is slower.
     // // Perhaps it would be better with multiple threads, or spatially grouped objects

@@ -57,7 +57,7 @@ fn turb(noise: &Perlin, p: Vec3, depth: usize) -> f32 {
     let mut temp_p = p;
     let mut weight = 1.0;
     for _i in 0..depth {
-        accum += weight * noise.get([temp_p.x as f64, temp_p.y as f64, temp_p.z as f64]);
+        accum += weight * noise.get([f64::from(temp_p.x), f64::from(temp_p.y), f64::from(temp_p.z)]);
         weight *= 0.5;
         temp_p *= 2.0;
     }

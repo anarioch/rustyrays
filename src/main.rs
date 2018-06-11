@@ -167,7 +167,7 @@ fn main() {
     let start_time = std::time::Instant::now();
     let mut last_time = std::time::Instant::now();
     print!("Processing...");
-    let io_flush = || std::io::stdout().flush().ok().expect("Could not flush stdout");
+    let io_flush = || std::io::stdout().flush().expect("Could not flush stdout");
     io_flush();
 
     // Generate the scene
