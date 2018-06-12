@@ -360,7 +360,6 @@ pub fn hit<'a>(ray: &Ray, t_min: f32, t_max: f32, objects: &'a [Box<Hitable>]) -
 
 #[cfg(test)]
 mod tests {
-    use super::super::math::*;
     use super::super::materials::Invisible;
     use super::*;
 
@@ -390,7 +389,6 @@ mod tests {
         // Optionally include some setup
         let aabb = AABB { min: Vec3::new( -2.0, -2.0, -2.0), max: Vec3::new(2.0, -1.5, 2.0) };
         let origin = Vec3::new(0.0, 0.0, 0.0);
-        let left = Vec3::new(-1.0, 0.0, 0.0);
         let down_y = Ray { origin, direction: Vec3::new(0.0, -1.0, 0.0) };
 
         b.iter(|| {
@@ -404,7 +402,6 @@ mod tests {
         // Optionally include some setup
         let sphere = Sphere { centre: Vec3::new(0.0, -2.0, 0.0), radius: 1.0, material: Box::new(Invisible {}) };
         let origin = Vec3::new(0.0, 0.0, 0.0);
-        let left = Vec3::new(-1.0, 0.0, 0.0);
         let down_y = Ray { origin, direction: Vec3::new(0.0, -1.0, 0.0) };
 
         b.iter(|| {
@@ -418,7 +415,6 @@ mod tests {
         // Optionally include some setup
         let rect = AARect { which: AARectWhich::XZ, a_min: -2.0, a_max: 2.0, b_min: -2.0, b_max: 2.0, c: -2.0, negate_normal: true, material: Box::new(Invisible {}) };
         let origin = Vec3::new(0.0, 0.0, 0.0);
-        let left = Vec3::new(-1.0, 0.0, 0.0);
         let down_y = Ray { origin, direction: Vec3::new(0.0, -1.0, 0.0) };
 
         b.iter(|| {
