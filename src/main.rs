@@ -143,12 +143,12 @@ fn clamp(mut x: f32, min: f32, max: f32) -> f32 {
 }
 
 fn main() {
-    const COLS: usize = 400;
-    const ROWS: usize = 400;
+    const COLS: usize = 200;
+    const ROWS: usize = 200;
     const NUM_SAMPLES: usize = 100; // Sample code recommends 100 but this is slow
     const MAX_BOUNCES: usize = 30;
 
-    println!("Hello, world!");
+    println!("Welcome to JDs Rustaceous Raytracer!");
 
     // Configure the camera
     const ASPECT_RATIO: f32 = COLS as f32 / ROWS as f32;
@@ -165,9 +165,9 @@ fn main() {
     let mut num_iterations = 0;
     let start_time = std::time::Instant::now();
     let mut last_time = std::time::Instant::now();
-    print!("Processing...");
     let io_flush = || std::io::stdout().flush().expect("Could not flush stdout");
     io_flush();
+    let mut total_rays = 0;
 
     // Generate the scene
     let scene_index = 1;
@@ -203,7 +203,9 @@ fn main() {
                 let u = (pu + rng.gen::<f32>()) / COLS as f32;
                 let v = (pv + rng.gen::<f32>()) / ROWS as f32;
                 let ray = camera.clip_to_ray(u, v);
-                colour += cast_ray(&ray, &bvh, MAX_BOUNCES);
+                let (ray_colour, ray_count) = cast_ray(&ray, &bvh, MAX_BOUNCES);
+                colour += ray_colour;
+                total_rays += ray_count;
             }
             colour *= 1.0 / NUM_SAMPLES as f32;
             // Clamp the colour to [0..1]
@@ -215,14 +217,21 @@ fn main() {
 
             num_iterations += 1;
             if last_time.elapsed().as_secs() >= 1 {
-                print!("\rProcessed {:.2}%", 100.0 * num_iterations as f32 / max_iterations as f32);
+                print!("\rProcessed {:.2}%; {} bounces so far.                    ", 100.0 * num_iterations as f32 / max_iterations as f32, total_rays);
                 io_flush();
                 last_time += std::time::Duration::from_secs(1);
             }
         }
     }
 
-    println!("\rProcessing done (Took {:.2}s)", post_scene_gen_time.elapsed().as_secs());
+    let generation_duration = post_scene_gen_time.elapsed();
+    let generation_seconds = generation_duration.as_secs() as f32 + generation_duration.subsec_nanos() as f32 / 1_000_000_000.0;
+    println!("\rProcessing done (Took {:.2}s).  {} rays cast.                            ", generation_seconds, total_rays);
+    println!("    Rows:       {}", ROWS);
+    println!("    Columns:    {}", COLS);
+    println!("    Rays/pixel: {}", NUM_SAMPLES);
+    println!("    Time taken: {:.3}", generation_seconds);
+    println!("    Rays cast:  {}", total_rays);
     println!("Writing file..");
 
     // Output the image to a file
@@ -232,20 +241,20 @@ fn main() {
 
 /// Cast a ray into the scene represented by the spatial lookup, returning a colour
 /// Depth should decrease by one for each bounced ray, terminating recursion onces it reaches zero
-fn cast_ray(ray: &Ray, object: &BVH, depth: usize) -> Vec3 {
+fn cast_ray(ray: &Ray, object: &BVH, depth: usize) -> (Vec3, usize) {
     match object.hit(&ray, 0.001, 1000.0) {
         Some(record) => {
             // (normal.normalise() + Vec3::new(1.0, 1.0, 1.0)) * 0.5 // Use this return value to visualise normals
             if depth == 0 {
-                return Vec3::new(0.0, 0.0, 0.0);
+                return (Vec3::new(0.0, 0.0, 0.0), 1);
             }
             let emission = record.material.emit();
             match record.material.scatter(&ray, &record) {
                 Some(scatter) => {
-                    let recurse = cast_ray(&scatter.scattered, &object, depth - 1);
-                    emission + scatter.attenuation.mul_vec(recurse)
+                    let (recurse,count) = cast_ray(&scatter.scattered, &object, depth - 1);
+                    (emission + scatter.attenuation.mul_vec(recurse), count + 1)
                 },
-                None => emission
+                None => (emission, 1)
             }
         },
         None => {
@@ -254,7 +263,7 @@ fn cast_ray(ray: &Ray, object: &BVH, depth: usize) -> Vec3 {
             let t = 0.5 * (unit.y + 1.0);
             let blue = Vec3::new(0.25, 0.35, 0.5);
             let white = Vec3::new(0.4, 0.4, 0.4);
-            white*(1.0 - t) + blue*t
+            (white*(1.0 - t) + blue*t, 1)
         }
     }
 }
