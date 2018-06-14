@@ -100,3 +100,46 @@ fn bench_hit_aarect(b: &mut Bencher) {
         rect.hit(&down_y, 0.0, 1000.0).unwrap();
     });
 }
+
+
+fn grid_scene() -> Vec<Box<Hitable>> {
+    let mut objects : Vec<Box<Hitable>> = Vec::new();
+
+    for a in -7..7 {
+        for b in -7..7 {
+            let centre = Vec3::new(a as f32, 0.0, b as f32);
+            objects.push(Box::new(Sphere { centre, radius: 0.2, material: Box::new(Invisible {}) }));
+        }
+    }
+
+    objects
+}
+
+#[bench]
+fn bench_ray_spheres_intersect(b: &mut Bencher) {
+    // Given: a grid of objects
+    let scene = grid_scene();
+
+    // Given: a few rays that do or don't intersect a/some/many objects
+    let ray_x_axis = Ray { origin: Vec3::new(0.5, 0.0, 0.0), direction: Vec3::new(1.0, 0.0, 0.0) };
+
+    b.iter(|| {
+        // Inner closure, the actual test
+        hit(&ray_x_axis, 0.001, 1000.0, &scene);
+    });
+}
+
+#[bench]
+fn bench_ray_spheres_intersect_bvh(b: &mut Bencher) {
+    // Given: a grid of objects
+    let mut scene = grid_scene();
+    let bvh = BVH::build(&mut scene);
+
+    // Given: a few rays that do or don't intersect a/some/many objects
+    let ray_x_axis = Ray { origin: Vec3::new(0.5, 0.0, 0.0), direction: Vec3::new(1.0, 0.0, 0.0) };
+
+    b.iter(|| {
+        // Inner closure, the actual test
+        bvh.hit(&ray_x_axis, 0.001, 1000.0);
+    });
+}

@@ -282,6 +282,6 @@ mod tests {
         // Then: the attenuation is the red that we defined on the material
         assert_eq!(res.attenuation, Vec3::new(1.0, 1.0, 1.0));
         assert_eq!(res.scattered.origin, hit.p);
-        assert_eq!(res.scattered.direction, Vec3::new(0.47140455, -0.8819171, 0.0));
+        assert_eq!(res.scattered.direction, Vec3::new(0.47140455, -0.8819171, 0.0)); // FIXME This depends on a random factor
     }
 }
