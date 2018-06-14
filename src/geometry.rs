@@ -338,13 +338,10 @@ pub fn hit<'a>(ray: &Ray, t_min: f32, t_max: f32, objects: &'a [Box<Hitable>]) -
     // // This algorithm seems like the more Rust-like way to do it.
     // // But because it doesn't get to prune future checks based on already seen objects, it is slower.
     // // Perhaps it would be better with multiple threads, or spatially grouped objects
-    // match objects.iter()
+    // objects.iter()
     //         .map(|obj| obj.hit(&ray, t_min, t_max))
-    //         .filter_map(|h| match h { HitResult::Hit(record) => Some(record), _ => None })
-    //         .min_by(|h1, h2| h1.t.partial_cmp(&h2.t).unwrap()) {
-    //     Some(record) => HitResult::Hit(record),
-    //     None => HitResult::Miss,
-    // }
+    //         .filter_map(|h| h)
+    //         .min_by(|h1, h2| h1.t.partial_cmp(&h2.t).unwrap())
 
     let mut result = None;
     let mut closest_so_far = t_max;
@@ -384,8 +381,22 @@ mod tests {
         };
     }
 
+    #[test]
+    fn ray_aabb_hit() {
+        // Given: An AABB and a ray
+        let aabb = AABB { min: Vec3::new( -2.0, -2.0, -2.0), max: Vec3::new(2.0, -1.5, 2.0) };
+        let origin = Vec3::new(0.0, 0.0, 0.0);
+        let down_y = Ray { origin, direction: Vec3::new(0.0, -1.0, 0.0) };
+
+        // When: we check for a hit
+        let res = aabb.hit(&down_y, 0.0, 1000.0);
+
+        // Then: there is a hit
+        assert_eq!(res, true);
+    }
+
     #[bench]
-    fn bench_hit_aabb(b: &mut Bencher) {
+    fn bench_ray_aabb_hit(b: &mut Bencher) {
         // Optionally include some setup
         let aabb = AABB { min: Vec3::new( -2.0, -2.0, -2.0), max: Vec3::new(2.0, -1.5, 2.0) };
         let origin = Vec3::new(0.0, 0.0, 0.0);
@@ -398,7 +409,33 @@ mod tests {
     }
 
     #[bench]
-    fn bench_hit_sphere(b: &mut Bencher) {
+    fn bench_ray_aabb_miss(b: &mut Bencher) {
+        // Optionally include some setup
+        let aabb = AABB { min: Vec3::new( -2.0, -2.0, -2.0), max: Vec3::new(2.0, -1.5, 2.0) };
+        let origin = Vec3::new(3.0, 0.0, 3.0);
+        let down_y = Ray { origin, direction: Vec3::new(0.0, -1.0, 0.0) };
+
+        b.iter(|| {
+            // Inner closure, the actual test
+            aabb.hit(&down_y, 0.0, 1000.0);
+        });
+    }
+
+    #[bench]
+    fn bench_ray_aabb_miss_by_t(b: &mut Bencher) {
+        // Optionally include some setup
+        let aabb = AABB { min: Vec3::new( -2.0, -2.0, -2.0), max: Vec3::new(2.0, -1.5, 2.0) };
+        let origin = Vec3::new(0.0, 0.0, 0.0);
+        let down_y = Ray { origin, direction: Vec3::new(0.0, -1.0, 0.0) };
+
+        b.iter(|| {
+            // Inner closure, the actual test
+            aabb.hit(&down_y, 0.0, 0.9);
+        });
+    }
+
+    #[bench]
+    fn bench_ray_sphere_hit(b: &mut Bencher) {
         // Optionally include some setup
         let sphere = Sphere { centre: Vec3::new(0.0, -2.0, 0.0), radius: 1.0, material: Box::new(Invisible {}) };
         let origin = Vec3::new(0.0, 0.0, 0.0);
@@ -407,6 +444,32 @@ mod tests {
         b.iter(|| {
             // Inner closure, the actual test
             sphere.hit(&down_y, 0.0, 1000.0).unwrap();
+        });
+    }
+
+    #[bench]
+    fn bench_ray_sphere_miss(b: &mut Bencher) {
+        // Optionally include some setup
+        let sphere = Sphere { centre: Vec3::new(0.0, -2.0, 0.0), radius: 1.0, material: Box::new(Invisible {}) };
+        let origin = Vec3::new(0.0, 0.0, 0.0);
+        let parallel_y = Ray { origin, direction: Vec3::new(2.0, -1.0, 0.0) };
+
+        b.iter(|| {
+            // Inner closure, the actual test
+            sphere.hit(&parallel_y, 0.0, 1000.0).is_none();
+        });
+    }
+
+    #[bench]
+    fn bench_ray_sphere_miss_by_t(b: &mut Bencher) {
+        // Optionally include some setup
+        let sphere = Sphere { centre: Vec3::new(0.0, -2.0, 0.0), radius: 1.0, material: Box::new(Invisible {}) };
+        let origin = Vec3::new(0.0, 0.0, 0.0);
+        let down_y = Ray { origin, direction: Vec3::new(0.0, -1.0, 0.0) };
+
+        b.iter(|| {
+            // Inner closure, the actual test
+            sphere.hit(&down_y, 0.0, 0.9).is_none();
         });
     }
 

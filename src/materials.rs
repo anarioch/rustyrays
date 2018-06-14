@@ -227,7 +227,6 @@ impl Material for DiffuseLight {
 
 #[cfg(test)]
 mod tests {
-    use super::super::math::*;
     use super::super::geometry::HitRecord;
     use super::*;
 

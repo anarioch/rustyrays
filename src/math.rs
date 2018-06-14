@@ -19,31 +19,37 @@ impl Vec3 {
         Vec3 { x, y, z }
     }
 
+    #[inline]
     pub fn set(&mut self, x: f32, y: f32, z: f32) {
         self.x = x;
         self.y = y;
         self.z = z;
     }
 
+    #[inline]
     pub fn normalise(&self) -> Vec3 {
         let length = self.len_sq().sqrt();
         self.mul(1.0 / length)
     }
 
+    #[inline]
     pub fn mul_vec(&self, other: Vec3) -> Vec3 {
         Vec3 { x: self.x * other.x, y: self.y * other.y, z: self.z * other.z }
     }
 
+    #[inline]
     pub fn min_vec(&self, other: Vec3) -> Vec3 {
         Vec3 { x: self.x.min(other.x), y: self.y.min(other.y), z: self.z.min(other.z) }
     }
 
+    #[inline]
     pub fn max_vec(&self, other: Vec3) -> Vec3 {
         Vec3 { x: self.x.max(other.x), y: self.y.max(other.y), z: self.z.max(other.z) }
     }
 
+    #[inline]
     pub fn len_sq(&self) -> f32 {
-        dot(*self, *self)
+        self.x * self.x + self.y * self.y + self.z * self.z
     }
 
     pub fn map(&self, f: fn(f32) -> f32) -> Vec3 {
@@ -149,10 +155,12 @@ impl Neg for Vec3 {
     }
 }
 
+#[inline]
 pub fn dot(v1: Vec3, v2: Vec3) -> f32 {
     v1.x * v2.x + v1.y * v2.y + v1.z * v2.z
 }
 
+#[inline]
 pub fn cross(v1: Vec3, v2: Vec3) -> Vec3 {
     Vec3 {
         x: v1.y * v2.z - v1.z * v2.y,
@@ -161,6 +169,7 @@ pub fn cross(v1: Vec3, v2: Vec3) -> Vec3 {
     }
 }
 
+#[inline]
 pub fn reflect(v: Vec3, n: Vec3) -> Vec3 {
     // v - 2*dot(v,n)*n
     v - 2.0 * dot(v, n) * n
