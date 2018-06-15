@@ -8,7 +8,7 @@ use raytrace::math::*;
 use raytrace::materials::Invisible;
 use raytrace::geometry::*;
 
-use test::Bencher;
+use test::{Bencher,black_box};
 
 #[bench]
 fn bench_ray_aabb_hit(b: &mut Bencher) {
@@ -19,7 +19,7 @@ fn bench_ray_aabb_hit(b: &mut Bencher) {
 
     b.iter(|| {
         // Inner closure, the actual test
-        aabb.hit(&down_y, 0.0, 1000.0);
+        aabb.hit(black_box(&down_y), 0.0, 1000.0);
     });
 }
 
@@ -32,7 +32,7 @@ fn bench_ray_aabb_miss(b: &mut Bencher) {
 
     b.iter(|| {
         // Inner closure, the actual test
-        aabb.hit(&down_y, 0.0, 1000.0);
+        aabb.hit(black_box(&down_y), 0.0, 1000.0);
     });
 }
 
@@ -45,7 +45,7 @@ fn bench_ray_aabb_miss_by_t(b: &mut Bencher) {
 
     b.iter(|| {
         // Inner closure, the actual test
-        aabb.hit(&down_y, 0.0, 0.9);
+        aabb.hit(black_box(&down_y), 0.0, 0.9);
     });
 }
 
@@ -58,7 +58,7 @@ fn bench_ray_sphere_hit(b: &mut Bencher) {
 
     b.iter(|| {
         // Inner closure, the actual test
-        sphere.hit(&down_y, 0.0, 1000.0).unwrap();
+        sphere.hit(black_box(&down_y), 0.0, 1000.0).unwrap();
     });
 }
 
@@ -71,7 +71,7 @@ fn bench_ray_sphere_miss(b: &mut Bencher) {
 
     b.iter(|| {
         // Inner closure, the actual test
-        sphere.hit(&parallel_y, 0.0, 1000.0).is_none();
+        sphere.hit(black_box(&parallel_y), 0.0, 1000.0).is_none();
     });
 }
 
@@ -84,12 +84,12 @@ fn bench_ray_sphere_miss_by_t(b: &mut Bencher) {
 
     b.iter(|| {
         // Inner closure, the actual test
-        sphere.hit(&down_y, 0.0, 0.9).is_none();
+        sphere.hit(black_box(&down_y), 0.0, 0.9).is_none();
     });
 }
 
 #[bench]
-fn bench_hit_aarect(b: &mut Bencher) {
+fn bench_ray_aarect_hit(b: &mut Bencher) {
     // Optionally include some setup
     let rect = AARect { which: AARectWhich::XZ, a_min: -2.0, a_max: 2.0, b_min: -2.0, b_max: 2.0, c: -2.0, negate_normal: true, material: Box::new(Invisible {}) };
     let origin = Vec3::new(0.0, 0.0, 0.0);
@@ -97,7 +97,7 @@ fn bench_hit_aarect(b: &mut Bencher) {
 
     b.iter(|| {
         // Inner closure, the actual test
-        rect.hit(&down_y, 0.0, 1000.0).unwrap();
+        rect.hit(black_box(&down_y), 0.0, 1000.0).unwrap();
     });
 }
 
@@ -116,7 +116,7 @@ fn grid_scene() -> Vec<Box<Hitable>> {
 }
 
 #[bench]
-fn bench_ray_spheres_intersect(b: &mut Bencher) {
+fn bench_ray_spherescene_hit(b: &mut Bencher) {
     // Given: a grid of objects
     let scene = grid_scene();
 
@@ -125,12 +125,12 @@ fn bench_ray_spheres_intersect(b: &mut Bencher) {
 
     b.iter(|| {
         // Inner closure, the actual test
-        hit(&ray_x_axis, 0.001, 1000.0, &scene);
+        hit(black_box(&ray_x_axis), 0.001, 1000.0, &scene);
     });
 }
 
 #[bench]
-fn bench_ray_spheres_intersect_bvh(b: &mut Bencher) {
+fn bench_ray_spherescene_bvh_hit(b: &mut Bencher) {
     // Given: a grid of objects
     let mut scene = grid_scene();
     let bvh = BVH::build(&mut scene);
@@ -140,6 +140,35 @@ fn bench_ray_spheres_intersect_bvh(b: &mut Bencher) {
 
     b.iter(|| {
         // Inner closure, the actual test
-        bvh.hit(&ray_x_axis, 0.001, 1000.0);
+        bvh.hit(black_box(&ray_x_axis), 0.001, 1000.0);
+    });
+}
+
+#[bench]
+fn bench_ray_spherescene_miss(b: &mut Bencher) {
+    // Given: a grid of objects
+    let scene = grid_scene();
+
+    // Given: a few rays that do or don't intersect a/some/many objects
+    let ray_x_axis = Ray { origin: Vec3::new(0.5, 2.0, 0.0), direction: Vec3::new(1.0, 0.0, 0.0) };
+
+    b.iter(|| {
+        // Inner closure, the actual test
+        hit(black_box(&ray_x_axis), 0.001, 1000.0, &scene);
+    });
+}
+
+#[bench]
+fn bench_ray_spherescene_bvh_miss(b: &mut Bencher) {
+    // Given: a grid of objects
+    let mut scene = grid_scene();
+    let bvh = BVH::build(&mut scene);
+
+    // Given: a few rays that do or don't intersect a/some/many objects
+    let ray_x_axis = Ray { origin: Vec3::new(0.5, 2.0, 0.0), direction: Vec3::new(1.0, 0.0, 0.0) };
+
+    b.iter(|| {
+        // Inner closure, the actual test
+        bvh.hit(black_box(&ray_x_axis), 0.001, 1000.0);
     });
 }

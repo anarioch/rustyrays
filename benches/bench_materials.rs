@@ -8,7 +8,7 @@ use raytrace::math::*;
 use raytrace::materials::*;
 use raytrace::geometry::*;
 
-use test::Bencher;
+use test::{Bencher,black_box};
 
 #[bench]
 fn bench_noise_texture(b: &mut Bencher) {
@@ -17,7 +17,7 @@ fn bench_noise_texture(b: &mut Bencher) {
 
     b.iter(|| {
         // Inner closure, the actual test
-        texture.value(0.0, 0.0, Vec3::new(0.0, 1.0, 1.0));
+        texture.value(0.0, 0.0, black_box(Vec3::new(0.0, 1.0, 1.0)));
     });
 }
 
@@ -30,7 +30,7 @@ fn bench_lambertian(b: &mut Bencher) {
 
     b.iter(|| {
         // Inner closure, the actual test
-        material.scatter(&ray, &hit).unwrap();
+        material.scatter(black_box(&ray), black_box(&hit)).unwrap();
     });
 }
 
@@ -44,7 +44,7 @@ fn bench_textured_lambertian(b: &mut Bencher) {
 
     b.iter(|| {
         // Inner closure, the actual test
-        material.scatter(&ray, &hit).unwrap();
+        material.scatter(black_box(&ray), black_box(&hit)).unwrap();
     });
 }
 
@@ -57,7 +57,7 @@ fn bench_metal(b: &mut Bencher) {
 
     b.iter(|| {
         // Inner closure, the actual test
-        material.scatter(&ray, &hit).unwrap();
+        material.scatter(black_box(&ray), black_box(&hit)).unwrap();
     });
 }
 
@@ -70,6 +70,6 @@ fn bench_dielectric(b: &mut Bencher) {
 
     b.iter(|| {
         // Inner closure, the actual test
-        material.scatter(&ray, &hit).unwrap();
+        material.scatter(black_box(&ray), black_box(&hit)).unwrap();
     });
 }
