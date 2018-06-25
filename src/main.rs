@@ -1,3 +1,5 @@
+#![deny(bare_trait_objects)]
+
 extern crate raytrace;
 extern crate rand;
 
@@ -57,8 +59,8 @@ impl Camera {
     }
 }
 
-fn random_scene() -> Vec<Box<Hitable>> {
-    let mut objects : Vec<Box<Hitable>> = Vec::new();
+fn random_scene() -> Vec<Box<dyn Hitable>> {
+    let mut objects : Vec<Box<dyn Hitable>> = Vec::new();
     let mut rng = rand::thread_rng();
     let mut rand = || rng.gen::<f32>();
 
@@ -82,7 +84,7 @@ fn random_scene() -> Vec<Box<Hitable>> {
         let radius = 0.2;
         let mut centre = Vec3::new(x + 0.9 * rand(), 0.0, z + 0.9 * rand());
         centre.y = (rad_sq - centre.x * centre.x).sqrt() - world_radius + radius;
-        let material: Box<Material> = match rand() {
+        let material: Box<dyn Material> = match rand() {
             d if d < 0.65 => Box::new(Lambertian { albedo: Vec3::new(rand() * rand(), rand() * rand(), rand() * rand()) }),
             d if d < 0.85 => Box::new(Metal { albedo: Vec3::new(0.5 * (1.0 + rand()), 0.5 * (1.0 + rand()), 0.5 * (1.0 + rand())), fuzz: 0.5 * rand() }),
             _ => Box::new(Dielectric { ref_index: 1.5 }),
@@ -119,8 +121,8 @@ fn random_scene() -> Vec<Box<Hitable>> {
     objects
 }
 
-fn noise_scene() -> Vec<Box<Hitable>> {
-    let mut objects : Vec<Box<Hitable>> = Vec::new();
+fn noise_scene() -> Vec<Box<dyn Hitable>> {
+    let mut objects : Vec<Box<dyn Hitable>> = Vec::new();
 
     // The giant world sphere on which all others sit
     let noise1 = Box::new(TexturedLambertian { albedo: Box::new(NoiseTexture::new(4.0, Vec3::new(1.0, 1.0, 1.0))) });
@@ -143,8 +145,8 @@ fn clamp(mut x: f32, min: f32, max: f32) -> f32 {
 }
 
 fn main() {
-    const COLS: usize = 200;
-    const ROWS: usize = 200;
+    const COLS: usize = 400;
+    const ROWS: usize = 400;
     const NUM_SAMPLES: usize = 100; // Sample code recommends 100 but this is slow
     const MAX_BOUNCES: usize = 30;
 

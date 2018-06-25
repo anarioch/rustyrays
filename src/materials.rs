@@ -23,8 +23,8 @@ impl Texture for ConstantTexture {
 
 pub struct CheckerTexture {
     pub check_size: f32,
-    pub odd: Box<Texture>,
-    pub even: Box<Texture>,
+    pub odd: Box<dyn Texture>,
+    pub even: Box<dyn Texture>,
 }
 
 impl Texture for CheckerTexture {
@@ -112,7 +112,7 @@ impl Material for Lambertian {
 }
 
 pub struct TexturedLambertian {
-    pub albedo: Box<Texture>,
+    pub albedo: Box<dyn Texture>,
 }
 
 impl Material for TexturedLambertian {
@@ -145,7 +145,7 @@ impl Material for Metal {
 }
 
 pub struct PolishedStone {
-    pub albedo: Box<Texture>,
+    pub albedo: Box<dyn Texture>,
 }
 
 impl Material for PolishedStone {

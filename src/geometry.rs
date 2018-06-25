@@ -114,7 +114,7 @@ pub struct HitRecord<'a> {
     pub t: f32,
     pub p: Vec3,
     pub normal: Vec3,
-    pub material: &'a Material,
+    pub material: &'a dyn Material,
 }
 
 pub trait Hitable {
@@ -125,7 +125,7 @@ pub trait Hitable {
 pub struct Sphere {
     pub centre: Vec3,
     pub radius: f32,
-    pub material: Box<Material>,
+    pub material: Box<dyn Material>,
 }
 
 fn sphere_ray_intersect(ray: &Ray, t_min: f32, t_max: f32, centre: Vec3, radius: f32) -> Option<f32> {
@@ -182,7 +182,7 @@ pub struct AARect {
     pub b_max: f32,
     pub c: f32,
     pub negate_normal: bool,
-    pub material: Box<Material>,
+    pub material: Box<dyn Material>,
 }
 
 impl Hitable for AARect {
@@ -292,27 +292,27 @@ impl Hitable for Clump {
 /// This is a binary tree that ultimately contains a Hitable
 pub enum BVH<'a> {
     Node { bounds: AABB, left: Box<BVH<'a>>, right: Box<BVH<'a>> },
-    Leaf { bounds: AABB, object: &'a Box<Hitable> },
+    Leaf { bounds: AABB, object: &'a Box<dyn Hitable> },
 }
 
 impl<'a> BVH<'a> {
-    fn compare_x_min(a: &Box<Hitable>, b: &Box<Hitable>) -> Ordering {
+    fn compare_x_min(a: &Box<dyn Hitable>, b: &Box<dyn Hitable>) -> Ordering {
         let a_val: f32 = a.bounds().unwrap().min.x;
         let b_val: f32 = b.bounds().unwrap().min.x;
         a_val.partial_cmp(&b_val).unwrap()
     }
-    fn _compare_y_min(a: &Box<Hitable>, b: &Box<Hitable>) -> Ordering {
+    fn _compare_y_min(a: &Box<dyn Hitable>, b: &Box<dyn Hitable>) -> Ordering {
         let a_val: f32 = a.bounds().unwrap().min.y;
         let b_val: f32 = b.bounds().unwrap().min.y;
         a_val.partial_cmp(&b_val).unwrap()
     }
-    fn compare_z_min(a: &Box<Hitable>, b: &Box<Hitable>) -> Ordering {
+    fn compare_z_min(a: &Box<dyn Hitable>, b: &Box<dyn Hitable>) -> Ordering {
         let a_val: f32 = a.bounds().unwrap().min.z;
         let b_val: f32 = b.bounds().unwrap().min.z;
         a_val.partial_cmp(&b_val).unwrap()
     }
     // TODO: Return Result<BVH,String>
-    pub fn build<'b>(objects: &'b mut [Box<Hitable>]) -> BVH {
+    pub fn build<'b>(objects: &'b mut [Box<dyn Hitable>]) -> BVH {
         // Base case of recursion
         let num_objects = objects.len();
         if num_objects == 1 {
@@ -338,7 +338,7 @@ impl<'a> BVH<'a> {
         BVH::Node { bounds, left: Box::new(left), right: Box::new(right) }
     }
 
-    pub fn glue(bvh: BVH<'a>, object: &'a Box<Hitable>) -> BVH<'a> {
+    pub fn glue(bvh: BVH<'a>, object: &'a Box<dyn Hitable>) -> BVH<'a> {
         let left = BVH::Leaf { bounds: object.bounds().unwrap(), object };
         let right = bvh;
         let bounds = left.bounds().union(right.bounds());
@@ -388,7 +388,7 @@ impl<'a> BVH<'a> {
     }
 }
 
-pub fn hit<'a>(ray: &Ray, t_min: f32, t_max: f32, objects: &'a [Box<Hitable>]) -> Option<HitRecord<'a>> {
+pub fn hit<'a>(ray: &Ray, t_min: f32, t_max: f32, objects: &'a [Box<dyn Hitable>]) -> Option<HitRecord<'a>> {
     // // This algorithm seems like the more Rust-like way to do it.
     // // But because it doesn't get to prune future checks based on already seen objects, it is slower.
     // // Perhaps it would be better with multiple threads, or spatially grouped objects
@@ -442,8 +442,8 @@ mod tests {
         let y_axis = new_dir(0.0, 1.0, 0.0);
 
         // Temp test: construct the ray separately to allow debugging
-        let ray = Ray { origin: along_x, direction: -y_axis };
-        assert_eq!(aabb.hit(&ray, 0.0, 1000.0), false);
+        let ray = Ray { origin: origin, direction: -y_axis };
+        assert_eq!(aabb.hit(&ray, 0.0, 1000.0), true);
 
         // When: we check for a hit then each ray raturns appropriately
         assert_eq!(aabb.hit(&Ray { origin: origin,  direction: -y_axis }, 0.0, 1000.0), true);  // ray pointing into box
