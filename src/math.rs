@@ -175,6 +175,7 @@ pub fn reflect(v: Vec3, n: Vec3) -> Vec3 {
     v - 2.0 * dot(v, n) * n
 }
 
+#[inline]
 pub fn refract(v: Vec3, n: Vec3, ni_over_nt: f32) -> Option<Vec3> {
     let v = v.normalise();
     let dt = dot(v, n);
@@ -198,6 +199,7 @@ impl Ray {
     pub fn new(origin: Vec3, direction: Vec3) -> Ray {
         Ray { origin, direction }
     }
+    #[inline]
     pub fn at_t(&self, t: f32) -> Vec3 {
         self.origin + self.direction * t
     }

@@ -172,3 +172,60 @@ fn bench_ray_spherescene_bvh_miss(b: &mut Bencher) {
         bvh.hit(black_box(&ray_x_axis), 0.001, 1000.0);
     });
 }
+
+#[bench]
+fn bench_ray_spherescene_naive_hit(b: &mut Bencher) {
+    // Given: a grid of objects
+    let scene = grid_scene();
+
+    // Given: a few rays that do or don't intersect a/some/many objects
+    let ray_x_axis = Ray { origin: Vec3::new(0.5, 0.0, 0.0), direction: Vec3::new(1.0, 0.0, 0.0) };
+
+    b.iter(|| {
+        // Inner closure, the actual test
+        let ray = black_box(&ray_x_axis);
+        for obj in &scene {
+            obj.hit(ray, 0.001, 1000.0);
+        }
+    });
+}
+
+#[bench]
+fn bench_ray_spherescene_aabbarray_hit(b: &mut Bencher) {
+    // Given: a grid of objects
+    let scene = grid_scene();
+    let mut aabbs: Vec<AABB> = Vec::with_capacity(scene.len());
+    for obj in &scene {
+        aabbs.push(obj.bounds().unwrap());
+    }
+
+    // Given: a few rays that do or don't intersect a/some/many objects
+    let ray_x_axis = Ray { origin: Vec3::new(0.5, 0.0, 0.0), direction: Vec3::new(1.0, 0.0, 0.0) };
+
+    b.iter(|| {
+        // Inner closure, the actual test
+        let ray = black_box(&ray_x_axis);
+        for obj in &aabbs {
+            obj.hit(ray, 0.001, 1000.0);
+        }
+        // let candidates = aabbs.iter()
+        //      .enumerate()
+        //      .filter_map(|(i,aabb)| match aabb.hit(ray, 0.001, 1000.0) { true => Some(i), false => None });
+
+        // candidates.collect::<Vec<usize>>();
+
+        // let mut result = None;
+        // let mut closest_so_far = 1000.0;
+        // for index in candidates {
+        //     let obj = &scene[index];
+        //     if let Some(record) = (*obj).hit(&ray, 0.001, closest_so_far) {
+        //         closest_so_far = record.t;
+        //         result = Some(record);
+        //     }
+        // }
+
+        // result;
+
+    });
+}
+

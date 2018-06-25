@@ -6,38 +6,92 @@ use std::cmp::Ordering;
 use rand;
 use rand::Rng;
 
+pub fn new_pos(x: f32, y: f32, z: f32) -> Vec3 {
+    Vec3::new(x, y, z)
+}
+
+pub fn new_dir(x: f32, y: f32, z: f32) -> Vec3 {
+    Vec3::new(x, y, z)
+}
+
 /// Axis Aligned Bounding Box
+#[derive(Debug)]
 pub struct AABB {
     pub min: Vec3,
     pub max: Vec3,
 }
 
 impl AABB {
-    pub fn hit(&self, ray: &Ray, t_min: f32, t_max: f32) -> bool {
+    pub fn hit(&self, ray: &Ray, mut t_min: f32, mut t_max: f32) -> bool {
         let inv_d = ray.direction.map(|x| 1.0 / x);
         let t0 = (self.min - ray.origin).mul_vec(inv_d);
         let t1 = (self.max - ray.origin).mul_vec(inv_d);
 
-        let (xt0,xt1) = if inv_d.x < 0.0 { (t1.x,t0.x) } else { (t0.x,t1.x) };
-        let t_min = t_min.max(xt0);
-        let t_max = t_max.min(xt1);
-        if t_max <= t_min {
-            return false;
+        if inv_d.x < 0.0 {
+            t_min = t_min.max(t1.x);
+            t_max = t_max.min(t0.x);
+            if t_max <= t_min {
+                return false;
+            }
+        }
+        else {
+            t_min = t_min.max(t0.x);
+            t_max = t_max.min(t1.x);
+            if t_max <= t_min {
+                return false;
+            }
         }
 
-        let (yt0,yt1) = if inv_d.y < 0.0 { (t1.y,t0.y) } else { (t0.y,t1.y) };
-        let t_min = t_min.max(yt0);
-        let t_max = t_max.min(yt1);
-        if t_max <= t_min {
-            return false;
+        if inv_d.y < 0.0 {
+            t_min = t_min.max(t1.y);
+            t_max = t_max.min(t0.y);
+            if t_max <= t_min {
+                return false;
+            }
+        }
+        else {
+            t_min = t_min.max(t0.y);
+            t_max = t_max.min(t1.y);
+            if t_max <= t_min {
+                return false;
+            }
         }
 
-        let (zt0,zt1) = if inv_d.z < 0.0 { (t1.z,t0.z) } else { (t0.z,t1.z) };
-        let t_min = t_min.max(zt0);
-        let t_max = t_max.min(zt1);
-        if t_max <= t_min {
-            return false;
+        if inv_d.z < 0.0 {
+            t_min = t_min.max(t1.z);
+            t_max = t_max.min(t0.z);
+            if t_max <= t_min {
+                return false;
+            }
         }
+        else {
+            t_min = t_min.max(t0.z);
+            t_max = t_max.min(t1.z);
+            if t_max <= t_min {
+                return false;
+            }
+        }
+
+        // let (xt0,xt1) = if inv_d.x < 0.0 { (t1.x,t0.x) } else { (t0.x,t1.x) };
+        // let t_min = t_min.max(xt0);
+        // let t_max = t_max.min(xt1);
+        // if t_max <= t_min {
+        //     return false;
+        // }
+
+        // let (yt0,yt1) = if inv_d.y < 0.0 { (t1.y,t0.y) } else { (t0.y,t1.y) };
+        // let t_min = t_min.max(yt0);
+        // let t_max = t_max.min(yt1);
+        // if t_max <= t_min {
+        //     return false;
+        // }
+
+        // let (zt0,zt1) = if inv_d.z < 0.0 { (t1.z,t0.z) } else { (t0.z,t1.z) };
+        // let t_min = t_min.max(zt0);
+        // let t_max = t_max.min(zt1);
+        // if t_max <= t_min {
+        //     return false;
+        // }
 
         true
     }
@@ -110,7 +164,7 @@ impl Hitable for Sphere {
         }
     }
     fn bounds(&self) -> Option<AABB> {
-        let rad = Vec3::new(self.radius, self.radius, self.radius);
+        let rad = new_dir(self.radius, self.radius, self.radius);
         Some(AABB { min: self.centre - rad, max: self.centre + rad })
     }
 }
@@ -138,8 +192,8 @@ impl Hitable for AARect {
         let direction = ray.direction;
         let (origin, direction) = match self.which {
             AARectWhich::XY => (origin, direction),
-            AARectWhich::XZ => (Vec3::new(origin.x, origin.z, origin.y), Vec3::new(direction.x, direction.z, direction.y)),
-            AARectWhich::YZ => (Vec3::new(origin.y, origin.z, origin.x), Vec3::new(direction.y, direction.z, direction.x)),
+            AARectWhich::XZ => (new_pos(origin.x, origin.z, origin.y), new_dir(direction.x, direction.z, direction.y)),
+            AARectWhich::YZ => (new_pos(origin.y, origin.z, origin.x), new_dir(direction.y, direction.z, direction.x)),
         };
 
         // Calculate ray/plane intersect and bail if it is outside the required t range
@@ -157,15 +211,15 @@ impl Hitable for AARect {
         }
 
         let p = ray.at_t(t);
-        let normal = Vec3::new(0.0, 0.0, if self.negate_normal { -1.0 } else { 1.0 });
+        let normal = new_dir(0.0, 0.0, if self.negate_normal { -1.0 } else { 1.0 });
         Some(HitRecord { t, p, normal, material: &*self.material })
     }
     fn bounds(&self) -> Option<AABB> {
         const FUDGE: f32 = 0.005; // Give the infinitesimal plane a pretend width for bounds calculations
         match self.which {
-            AARectWhich::XY => Some(AABB { min: Vec3::new(self.a_min, self.b_min, self.c - FUDGE), max: Vec3::new(self.a_max, self.b_max, self.c + FUDGE) }),
-            AARectWhich::XZ => Some(AABB { min: Vec3::new(self.a_min, self.c - FUDGE, self.b_min), max: Vec3::new(self.a_max, self.c + FUDGE, self.b_max) }),
-            AARectWhich::YZ => Some(AABB { min: Vec3::new(self.c - FUDGE, self.a_min, self.b_min), max: Vec3::new(self.c + FUDGE, self.a_max, self.b_max) }),
+            AARectWhich::XY => Some(AABB { min: new_pos(self.a_min, self.b_min, self.c - FUDGE), max: new_pos(self.a_max, self.b_max, self.c + FUDGE) }),
+            AARectWhich::XZ => Some(AABB { min: new_pos(self.a_min, self.c - FUDGE, self.b_min), max: new_pos(self.a_max, self.c + FUDGE, self.b_max) }),
+            AARectWhich::YZ => Some(AABB { min: new_pos(self.c - FUDGE, self.a_min, self.b_min), max: new_pos(self.c + FUDGE, self.a_max, self.b_max) }),
         }
     }
 }
@@ -362,12 +416,12 @@ mod tests {
 
     #[test]
     fn hit_sphere_works() {
-        let origin = Vec3::new(0.0, 0.0, 0.0);
-        let left = Vec3::new(-1.0, 0.0, 0.0);
-        let down_y = Ray { origin, direction: Vec3::new(0.0, -1.0, 0.0) };
-        let down_y_parallel = Ray { origin: 2.0 * left, direction: Vec3::new(0.0, -1.0, 0.0) };
+        let origin = new_pos(0.0, 0.0, 0.0);
+        let left = new_pos(-2.0, 0.0, 0.0);
+        let down_y = Ray { origin, direction: new_dir(0.0, -1.0, 0.0) };
+        let down_y_parallel = Ray { origin: left, direction: new_dir(0.0, -1.0, 0.0) };
         // Expected hit: ray along y axis and sphere 2 units down y axis
-        let sphere = Sphere { centre: Vec3::new(0.0, -2.0, 0.0), radius: 1.0, material: Box::new(Invisible {}) };
+        let sphere = Sphere { centre: new_pos(0.0, -2.0, 0.0), radius: 1.0, material: Box::new(Invisible {}) };
         match sphere.hit(&down_y, 0.0, 1000.0) {
             None => panic!("This ray and sphere were supposed to hit"),
             Some(record) => assert_eq!(record.t, 1.0),
@@ -381,16 +435,22 @@ mod tests {
 
     #[test]
     fn ray_aabb_hit() {
-        // Given: An AABB and a ray
-        let aabb = AABB { min: Vec3::new( -2.0, -2.0, -2.0), max: Vec3::new(2.0, -1.5, 2.0) };
-        let origin = Vec3::new(0.0, 0.0, 0.0);
-        let down_y = Ray { origin, direction: Vec3::new(0.0, -1.0, 0.0) };
+        // Given: An AABB
+        let aabb = AABB { min: new_pos( -2.0, -2.0, -2.0), max: new_pos(2.0, -1.5, 2.0) };
+        let origin = new_pos(0.0, 0.0, 0.0);
+        let along_x = new_pos(3.0, 0.0, 0.0);
+        let y_axis = new_dir(0.0, 1.0, 0.0);
 
-        // When: we check for a hit
-        let res = aabb.hit(&down_y, 0.0, 1000.0);
+        // Temp test: construct the ray separately to allow debugging
+        let ray = Ray { origin: along_x, direction: -y_axis };
+        assert_eq!(aabb.hit(&ray, 0.0, 1000.0), false);
 
-        // Then: there is a hit
-        assert_eq!(res, true);
+        // When: we check for a hit then each ray raturns appropriately
+        assert_eq!(aabb.hit(&Ray { origin: origin,  direction: -y_axis }, 0.0, 1000.0), true);  // ray pointing into box
+        assert_eq!(aabb.hit(&Ray { origin: origin,  direction: -y_axis }, 0.0,    1.0), false); // ray pointing into box but t range too short
+        assert_eq!(aabb.hit(&Ray { origin: origin,  direction:  y_axis }, 0.0, 1000.0), false); // ray pointing away from box
+        assert_eq!(aabb.hit(&Ray { origin: along_x, direction: -y_axis }, 0.0, 1000.0), false); // ray parallel to y axis and along x
+        assert_eq!(aabb.hit(&Ray { origin: along_x, direction:  y_axis }, 0.0, 1000.0), false); // ray parallel to y axis and along x, pointing away
     }
 
 }

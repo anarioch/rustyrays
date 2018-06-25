@@ -3,6 +3,14 @@ name = "raytrace"
 version = "0.1.0"
 authors = ["Jerome Dolman <jerome@novapsi.net.nz>"]
 
+[profile.release]
+debug = true
+lto = true
+
+[profile.bench]
+debug = true
+lto = true
+
 [dependencies]
 
 rand = "0.5.0"
