@@ -19,7 +19,7 @@ fn bench_ray_aabb_hit(b: &mut Bencher) {
 
     b.iter(|| {
         // Inner closure, the actual test
-        aabb.hit(black_box(&down_y), 0.0, 1000.0);
+        black_box(aabb.hit(black_box(&down_y), 0.0, 1000.0));
     });
 }
 
@@ -32,7 +32,7 @@ fn bench_ray_aabb_miss(b: &mut Bencher) {
 
     b.iter(|| {
         // Inner closure, the actual test
-        aabb.hit(black_box(&down_y), 0.0, 1000.0);
+        black_box(aabb.hit(black_box(&down_y), 0.0, 1000.0));
     });
 }
 
@@ -45,7 +45,7 @@ fn bench_ray_aabb_miss_by_t(b: &mut Bencher) {
 
     b.iter(|| {
         // Inner closure, the actual test
-        aabb.hit(black_box(&down_y), 0.0, 0.9);
+        black_box(aabb.hit(black_box(&down_y), 0.0, 0.9));
     });
 }
 
@@ -58,7 +58,7 @@ fn bench_ray_sphere_hit(b: &mut Bencher) {
 
     b.iter(|| {
         // Inner closure, the actual test
-        sphere.hit(black_box(&down_y), 0.0, 1000.0).unwrap();
+        black_box(sphere.hit(black_box(&down_y), 0.0, 1000.0).unwrap());
     });
 }
 
@@ -71,7 +71,7 @@ fn bench_ray_sphere_miss(b: &mut Bencher) {
 
     b.iter(|| {
         // Inner closure, the actual test
-        sphere.hit(black_box(&parallel_y), 0.0, 1000.0).is_none();
+        black_box(sphere.hit(black_box(&parallel_y), 0.0, 1000.0).is_none());
     });
 }
 
@@ -84,7 +84,7 @@ fn bench_ray_sphere_miss_by_t(b: &mut Bencher) {
 
     b.iter(|| {
         // Inner closure, the actual test
-        sphere.hit(black_box(&down_y), 0.0, 0.9).is_none();
+        black_box(sphere.hit(black_box(&down_y), 0.0, 0.9).is_none());
     });
 }
 
@@ -97,7 +97,7 @@ fn bench_ray_aarect_hit(b: &mut Bencher) {
 
     b.iter(|| {
         // Inner closure, the actual test
-        rect.hit(black_box(&down_y), 0.0, 1000.0).unwrap();
+        black_box(rect.hit(black_box(&down_y), 0.0, 1000.0).unwrap());
     });
 }
 
@@ -125,7 +125,7 @@ fn bench_ray_spherescene_hit(b: &mut Bencher) {
 
     b.iter(|| {
         // Inner closure, the actual test
-        hit(black_box(&ray_x_axis), 0.001, 1000.0, &scene);
+        black_box(hit(black_box(&ray_x_axis), 0.001, 1000.0, &scene));
     });
 }
 
@@ -140,7 +140,7 @@ fn bench_ray_spherescene_bvh_hit(b: &mut Bencher) {
 
     b.iter(|| {
         // Inner closure, the actual test
-        bvh.hit(black_box(&ray_x_axis), 0.001, 1000.0);
+        black_box(bvh.hit(black_box(&ray_x_axis), 0.001, 1000.0));
     });
 }
 
@@ -154,7 +154,7 @@ fn bench_ray_spherescene_miss(b: &mut Bencher) {
 
     b.iter(|| {
         // Inner closure, the actual test
-        hit(black_box(&ray_x_axis), 0.001, 1000.0, &scene);
+        black_box(hit(black_box(&ray_x_axis), 0.001, 1000.0, &scene));
     });
 }
 
@@ -169,7 +169,7 @@ fn bench_ray_spherescene_bvh_miss(b: &mut Bencher) {
 
     b.iter(|| {
         // Inner closure, the actual test
-        bvh.hit(black_box(&ray_x_axis), 0.001, 1000.0);
+        black_box(bvh.hit(black_box(&ray_x_axis), 0.001, 1000.0));
     });
 }
 
@@ -185,7 +185,7 @@ fn bench_ray_spherescene_naive_hit(b: &mut Bencher) {
         // Inner closure, the actual test
         let ray = black_box(&ray_x_axis);
         for obj in &scene {
-            obj.hit(ray, 0.001, 1000.0);
+            black_box(obj.hit(ray, 0.001, 1000.0));
         }
     });
 }
@@ -206,7 +206,7 @@ fn bench_ray_spherescene_aabbarray_hit(b: &mut Bencher) {
         // Inner closure, the actual test
         let ray = black_box(&ray_x_axis);
         for obj in &aabbs {
-            obj.hit(ray, 0.001, 1000.0);
+            black_box(obj.hit(ray, 0.001, 1000.0));
         }
         // let candidates = aabbs.iter()
         //      .enumerate()
