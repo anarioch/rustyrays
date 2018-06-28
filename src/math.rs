@@ -15,7 +15,7 @@ pub struct Vec3 {
 
 impl Vec3 {
 
-    pub fn new(x: f32, y: f32, z: f32) -> Vec3 {
+    pub fn new(x: f32, y: f32, z: f32) -> Self {
         Vec3 { x, y, z }
     }
 
@@ -27,23 +27,23 @@ impl Vec3 {
     }
 
     #[inline]
-    pub fn normalise(&self) -> Vec3 {
+    pub fn normalise(&self) -> Self {
         let length = self.len_sq().sqrt();
         self.mul(1.0 / length)
     }
 
     #[inline]
-    pub fn mul_vec(&self, other: Vec3) -> Vec3 {
+    pub fn mul_vec(&self, other: Vec3) -> Self {
         Vec3 { x: self.x * other.x, y: self.y * other.y, z: self.z * other.z }
     }
 
     #[inline]
-    pub fn min_vec(&self, other: Vec3) -> Vec3 {
+    pub fn min_vec(&self, other: Vec3) -> Self {
         Vec3 { x: self.x.min(other.x), y: self.y.min(other.y), z: self.z.min(other.z) }
     }
 
     #[inline]
-    pub fn max_vec(&self, other: Vec3) -> Vec3 {
+    pub fn max_vec(&self, other: Vec3) -> Self {
         Vec3 { x: self.x.max(other.x), y: self.y.max(other.y), z: self.z.max(other.z) }
     }
 
@@ -52,7 +52,7 @@ impl Vec3 {
         self.x * self.x + self.y * self.y + self.z * self.z
     }
 
-    pub fn map(&self, f: fn(f32) -> f32) -> Vec3 {
+    pub fn map(&self, f: fn(f32) -> f32) -> Self {
         Vec3 {
             x: f(self.x),
             y: f(self.y),
@@ -196,7 +196,7 @@ pub struct Ray {
 }
 
 impl Ray {
-    pub fn new(origin: Vec3, direction: Vec3) -> Ray {
+    pub fn new(origin: Vec3, direction: Vec3) -> Self {
         Ray { origin, direction }
     }
     #[inline]
@@ -271,6 +271,16 @@ mod tests {
         let z_axis = Vec3::new(0.0, 0.0, 1.0);
 
         assert_eq!(cross(x_axis, y_axis), z_axis);
+    }
+
+    #[test]
+    fn reflect_vector() {
+        let x_axis = Vec3::new(1.0, 0.0, 0.0);
+        let y_axis = Vec3::new(0.0, 1.0, 0.0);
+        let dir = Vec3::new(1.0, -1.0, 0.0); // Within the X-Z plane, heading down at 45 degrees
+
+        assert_eq!(reflect(dir, y_axis), Vec3::new(1.0, 1.0, 0.0));
+        assert_eq!(reflect(dir, x_axis), Vec3::new(-1.0, -1.0, 0.0));
     }
 
     #[test]

@@ -96,14 +96,14 @@ impl AABB {
         true
     }
 
-    pub fn union(&self, other: &AABB) -> AABB {
+    pub fn union(&self, other: &Self) -> Self {
         AABB {
             min: self.min.min_vec(other.min),
             max: self.max.max_vec(other.max),
         }
     }
 
-    pub fn union_assign(&mut self, other: &AABB) {
+    pub fn union_assign(&mut self, other: &Self) {
         self.min = self.min.min_vec(other.min);
         self.max = self.max.max_vec(other.max);
     }
@@ -230,7 +230,7 @@ pub struct Clump {
 }
 
 impl Clump {
-    pub fn new(objects: Vec<Sphere>) -> Clump {
+    pub fn new(objects: Vec<Sphere>) -> Self {
         let bounds = Self::compute_bounds(&objects);
         Clump { bounds, objects }
     }

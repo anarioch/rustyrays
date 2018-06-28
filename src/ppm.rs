@@ -7,7 +7,7 @@ pub struct PpmImage {
 }
 
 impl PpmImage {
-    pub fn create(width: usize, height: usize) -> PpmImage {
+    pub fn create(width: usize, height: usize) -> Self {
         PpmImage { width, height, body: String::from("") }
     }
 
