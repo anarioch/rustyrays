@@ -52,6 +52,7 @@ impl Vec3 {
         self.x * self.x + self.y * self.y + self.z * self.z
     }
 
+    #[inline]
     pub fn map(&self, f: fn(f32) -> f32) -> Self {
         Vec3 {
             x: f(self.x),
@@ -59,9 +60,11 @@ impl Vec3 {
             z: f(self.z),
         }
     }
-    // pub fn length(&self) -> f32 {
-    //     dot(self, self).sqrt()
-    // }
+    
+    #[inline]
+    pub fn length(&self) -> f32 {
+        self.len_sq().sqrt()
+    }
 
     pub fn random_in_unit_sphere(rng: &mut ThreadRng) -> Vec3 {
         let mut p = Vec3::new(2.0, 2.0, 2.0);
@@ -189,7 +192,7 @@ pub fn refract(v: Vec3, n: Vec3, ni_over_nt: f32) -> Option<Vec3> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Ray {
     pub origin: Vec3,
     pub direction: Vec3,
@@ -226,11 +229,18 @@ mod tests {
     }
 
     #[test]
-    fn vec3_len_sq() {
+    fn vec3_length() {
+        // Check len_sq
         assert_eq!(Vec3::new(0.0, 0.0, 0.0).len_sq(), 0.0);
         assert_eq!(Vec3::new(0.0, 1.0, 0.0).len_sq(), 1.0);
         assert_eq!(Vec3::new(0.0, 5.0, 0.0).len_sq(), 25.0);
         assert_eq!(Vec3::new(1.0, 1.0, 1.0).len_sq(), 3.0);
+
+        // Check length
+        assert_eq!(Vec3::new(0.0, 0.0, 0.0).length(), 0.0);
+        assert_eq!(Vec3::new(0.0, 1.0, 0.0).length(), 1.0);
+        assert_eq!(Vec3::new(0.0, 5.0, 0.0).length(), 5.0);
+        assert_eq!(Vec3::new(1.0, 1.0, 1.0).length(), f32::sqrt(3.0));
     }
 
     #[test]

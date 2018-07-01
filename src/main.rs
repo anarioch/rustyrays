@@ -14,50 +14,7 @@ use raytrace::math::*;
 use raytrace::ppm::PpmImage;
 use raytrace::geometry::*;
 use raytrace::materials::*;
-
-struct Camera {
-    lower_left : Vec3,
-    horizontal : Vec3,
-    vertical : Vec3,
-    eye : Vec3,
-    u: Vec3,
-    v: Vec3,
-    _w: Vec3,
-    lens_radius: f32,
-}
-
-impl Camera {
-    fn new(eye: Vec3, lookat: Vec3, vup: Vec3, vfov: f32, aspect_ratio: f32, aperture: f32, focus_dist: f32) -> Camera {
-        let lens_radius = 0.5 * aperture;
-
-        // Compute Field of View
-        let theta = vfov * std::f32::consts::PI / 180.0;
-        let half_height = (0.5 * theta).tan();
-        let half_width = aspect_ratio * half_height;
-
-        // Compute basis
-        let w = (eye - lookat).normalise();
-        let u = cross(vup, w).normalise();
-        let v = cross(w, u);
-
-        // Compute vectors used to reconstitute the virtual screen that we project onto
-        let lower_left = eye - u*(focus_dist*half_width) - v*(focus_dist*half_height) - w*focus_dist;
-        let horizontal = u*(2.0 * focus_dist*half_width);
-        let vertical = v*(2.0 * focus_dist*half_height);
-
-        Camera { lower_left, horizontal, vertical, eye, u, v, _w: w, lens_radius }
-    }
-
-    fn clip_to_ray(&self, u: f32, v: f32) -> Ray {
-        // // Basic projection
-        // Ray::new(self.eye, self.lower_left + self.horizontal * u + self.vertical * v - self.eye)
-        // Add noise to eye location to achieve depth-if-field
-        let rd = Vec3::random_in_unit_disk(&mut rand::thread_rng()) * self.lens_radius;
-        let offset = self.u * rd.x + self.v * rd.y;
-        let eye = self.eye + offset;
-        Ray::new(eye, self.lower_left + self.horizontal * u + self.vertical * v - eye)
-    }
-}
+use raytrace::Camera;
 
 fn random_scene() -> Vec<Box<dyn Hitable>> {
     let mut objects : Vec<Box<dyn Hitable>> = Vec::new();
@@ -159,7 +116,7 @@ fn main() {
     let eye = Vec3::new(10.0, 1.1, 0.3);
     let focus = Vec3::new(4.0, 0.55, -0.3);
     let up = Vec3::new(0.0, 1.0, 0.0);
-    let dist_to_focus = (focus - eye).len_sq().sqrt();
+    let dist_to_focus = (focus - eye).length();
     let camera = Camera::new(eye, focus, up, FIELD_OF_VIEW, ASPECT_RATIO, APERTURE, dist_to_focus);
 
     // Set up variables for timing and progress printing
@@ -205,7 +162,7 @@ fn main() {
                 let u = (pu + rng.gen::<f32>()) / COLS as f32;
                 let v = (pv + rng.gen::<f32>()) / ROWS as f32;
                 let ray = camera.clip_to_ray(u, v);
-                let (ray_colour, ray_count) = cast_ray(&ray, &bvh, MAX_BOUNCES);
+                let (ray_colour, ray_count) = raytrace::cast_ray(&ray, &bvh, MAX_BOUNCES);
                 colour += ray_colour;
                 total_rays += ray_count;
             }
@@ -219,55 +176,32 @@ fn main() {
 
             num_iterations += 1;
             if last_time.elapsed().as_secs() >= 1 {
-                print!("\rProcessed {:.2}%; {} bounces so far.                    ", 100.0 * num_iterations as f32 / max_iterations as f32, total_rays);
+                let percentage_done = 100.0 * num_iterations as f32 / max_iterations as f32;
+                let time_elapsed = post_scene_gen_time.elapsed();
+                let time_elapsed = 1_000_000_000.0 * time_elapsed.as_secs() as f32 + time_elapsed.subsec_nanos() as f32;
+                let time_per_ray = time_elapsed / total_rays as f32;
+                print!("\rProcessed {:2.2}%;  {} bounces so far;  {:3.2}ns/ray                    ", percentage_done, total_rays, time_per_ray);
                 io_flush();
                 last_time += std::time::Duration::from_secs(1);
             }
         }
     }
 
-    let generation_duration = post_scene_gen_time.elapsed();
-    let generation_seconds = generation_duration.as_secs() as f32 + generation_duration.subsec_nanos() as f32 / 1_000_000_000.0;
-    println!("\rProcessing done (Took {:.2}s).  {} rays cast.                            ", generation_seconds, total_rays);
+    let time_elapsed = post_scene_gen_time.elapsed();
+    let time_elapsed = 1_000_000_000.0 * time_elapsed.as_secs() as f32 + time_elapsed.subsec_nanos() as f32;
+    let time_per_ray = time_elapsed / total_rays as f32;
+    println!("\rProcessing done.                                                ");
     println!("    Rows:       {}", ROWS);
     println!("    Columns:    {}", COLS);
     println!("    Rays/pixel: {}", NUM_SAMPLES);
-    println!("    Time taken: {:.3}", generation_seconds);
+    println!("    ns/ray:     {:.1}", time_per_ray);
+    println!("    Time taken: {:.3}", time_elapsed / 1_000_000_000.0);
     println!("    Rays cast:  {}", total_rays);
     println!("Writing file..");
 
     // Output the image to a file
     let path = Path::new("out/output.ppm");
     write_text_to_file(&image.get_text(), &path);
-}
-
-/// Cast a ray into the scene represented by the spatial lookup, returning a colour
-/// Depth should decrease by one for each bounced ray, terminating recursion onces it reaches zero
-fn cast_ray(ray: &Ray, object: &BVH, depth: usize) -> (Vec3, usize) {
-    match object.hit(&ray, 0.001, 1000.0) {
-        Some(record) => {
-            // (normal.normalise() + Vec3::new(1.0, 1.0, 1.0)) * 0.5 // Use this return value to visualise normals
-            if depth == 0 {
-                return (Vec3::new(0.0, 0.0, 0.0), 1);
-            }
-            let emission = record.material.emit();
-            match record.material.scatter(&ray, &record) {
-                Some(scatter) => {
-                    let (recurse,count) = cast_ray(&scatter.scattered, &object, depth - 1);
-                    (emission + scatter.attenuation.mul_vec(recurse), count + 1)
-                },
-                None => (emission, 1)
-            }
-        },
-        None => {
-            // Vec3::new(0.0, 0.0, 0.0)
-            let unit = ray.direction.normalise();
-            let t = 0.5 * (unit.y + 1.0);
-            let blue = Vec3::new(0.25, 0.35, 0.5);
-            let white = Vec3::new(0.4, 0.4, 0.4);
-            (white*(1.0 - t) + blue*t, 1)
-        }
-    }
 }
 
 fn write_text_to_file(text: &str, path: &Path) {
