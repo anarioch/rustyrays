@@ -16,24 +16,22 @@ use raytrace::geometry::*;
 use raytrace::materials::*;
 use raytrace::Camera;
 
-fn random_scene() -> Vec<Box<dyn Hitable>> {
+/// Definition of a scene to be rendered, including objects and camera.
+/// Objects are split into two groups, to provide hints for BVH construction
+struct Scene {
+    objects: Vec<Box<dyn Hitable>>,
+    outlier_objects: Vec<Box<dyn Hitable>>,
+    camera: Camera,
+}
+
+fn random_scene(aspect_ratio: f32) -> Scene {
     let mut objects : Vec<Box<dyn Hitable>> = Vec::new();
+    let mut outlier_objects : Vec<Box<dyn Hitable>> = Vec::new();
     let mut rng = rand::thread_rng();
     let mut rand = || rng.gen::<f32>();
 
-    // The giant world sphere on which all others sit
     let world_centre = Vec3::new(0.0, -1000.0, 0.0);
     let world_radius = 1000.0;
-    let globe_texture = CheckerTexture {
-        check_size: 10.0,
-        odd: Box::new(ConstantTexture { colour: Vec3::new(0.2, 0.3, 0.1) }),
-        even: Box::new(ConstantTexture { colour: Vec3::new(0.9, 0.9, 0.9) }),
-    };
-    objects.push(Box::new(Sphere {
-        centre: world_centre,
-        radius: world_radius,
-        material: Box::new(TexturedLambertian { albedo: Box::new(globe_texture) }),
-    }));
 
     // Create closure that creates a randomised sphere within the x,z unit cell
     let rad_sq = world_radius * world_radius;
@@ -55,6 +53,7 @@ fn random_scene() -> Vec<Box<dyn Hitable>> {
         }
     }
 
+    // Three feature spheres, showing off some of the materials
     // let reddish = Box::new(Lambertian { albedo: Box::new(ConstantTexture { colour: Vec3::new(0.7, 0.2, 0.3) }) });
     let gold = Box::new(Metal { albedo: Vec3::new(0.8, 0.6, 0.2), fuzz: 0.0 });
     let marble = Box::new(PolishedStone { albedo: Box::new(NoiseTexture::new(12.0, Vec3::new(0.6, 0.1, 0.2))) });
@@ -63,27 +62,51 @@ fn random_scene() -> Vec<Box<dyn Hitable>> {
     objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 0.5, -1.0), radius: 0.5, material: glass }));
     objects.push(Box::new(Sphere { centre: Vec3::new(4.0, 0.5, -1.0), radius: 0.5, material: marble }));
 
+    // A glowing orb up above all other objects to light the scene
     let bulb = Box::new(DiffuseLight { emission_colour: Vec3::new(2.0, 2.0, 2.0) });
-    objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 10.0, -1.0), radius: 5.0, material: bulb }));
+    outlier_objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 10.0, -1.0), radius: 5.0, material: bulb }));
 
     // Neat trick: embed a small sphere in another to simulate glass.  Might work by reversing coefficient also
     // let glass2 = Box::new(Dielectric { ref_index: 1.5 });
     // objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 0.0, -1.0), radius: 0.5, material: glass }));
     // objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 0.0, -1.0), radius: -0.45, material: glass2 }));
 
+    // A gold wall
     let brushed_gold = Box::new(Metal { albedo: Vec3::new(1.0, 0.85, 0.0), fuzz: 0.3 });
     // let brushed_copper = Box::new(Metal { albedo: Vec3::new(0.7, 0.45, 0.2), fuzz: 0.3 });
-    objects.push(Box::new(AARect { which: AARectWhich::XY, a_min: -4.0, a_max: 4.0, b_min: -4.0, b_max: 1.3, c: -1.7, negate_normal: false, material: brushed_gold}));
+    outlier_objects.push(Box::new(AARect { which: AARectWhich::XY, a_min: -4.0, a_max: 4.0, b_min: -4.0, b_max: 1.3, c: -1.7, negate_normal: false, material: brushed_gold}));
 
-    objects
+    // The giant world sphere on which all others sit
+    let globe_texture = CheckerTexture {
+        check_size: 10.0,
+        odd: Box::new(ConstantTexture { colour: Vec3::new(0.2, 0.3, 0.1) }),
+        even: Box::new(ConstantTexture { colour: Vec3::new(0.9, 0.9, 0.9) }),
+    };
+    outlier_objects.push(Box::new(Sphere {
+        centre: world_centre,
+        radius: world_radius,
+        material: Box::new(TexturedLambertian { albedo: Box::new(globe_texture) }),
+    }));
+
+    // Configure the camera
+    const APERTURE: f32 = 0.03;
+    const FIELD_OF_VIEW: f32 = 20.0;
+    let eye = Vec3::new(10.0, 1.1, 0.3);
+    let focus = Vec3::new(4.0, 0.55, -0.3);
+    let up = Vec3::new(0.0, 1.0, 0.0);
+    let dist_to_focus = (focus - eye).length();
+    let camera = Camera::new(eye, focus, up, FIELD_OF_VIEW, aspect_ratio, APERTURE, dist_to_focus);
+
+    Scene { objects, outlier_objects, camera }
 }
 
-fn noise_scene() -> Vec<Box<dyn Hitable>> {
+fn noise_scene(aspect_ratio: f32) -> Scene {
     let mut objects : Vec<Box<dyn Hitable>> = Vec::new();
+    let mut outlier_objects : Vec<Box<dyn Hitable>> = Vec::new();
 
     // The giant world sphere on which all others sit
     let noise1 = Box::new(TexturedLambertian { albedo: Box::new(NoiseTexture::new(4.0, Vec3::new(1.0, 1.0, 1.0))) });
-    objects.push(Box::new(Sphere {
+    outlier_objects.push(Box::new(Sphere {
         centre: Vec3::new(0.0, -1000.5, -2.0),
         radius: 1000.0,
         material: noise1,
@@ -92,7 +115,16 @@ fn noise_scene() -> Vec<Box<dyn Hitable>> {
     let marble = Box::new(PolishedStone { albedo: Box::new(NoiseTexture::new(12.0, Vec3::new(0.6, 0.2, 0.1))) });
     objects.push(Box::new(Sphere { centre: Vec3::new(4.0, 0.0, -1.0), radius: 0.5, material: marble }));
 
-    objects
+    // Configure the camera
+    const APERTURE: f32 = 0.03;
+    const FIELD_OF_VIEW: f32 = 20.0;
+    let eye = Vec3::new(10.0, 1.1, 0.3);
+    let focus = Vec3::new(4.0, 0.55, -0.3);
+    let up = Vec3::new(0.0, 1.0, 0.0);
+    let dist_to_focus = (focus - eye).length();
+    let camera = Camera::new(eye, focus, up, FIELD_OF_VIEW, aspect_ratio, APERTURE, dist_to_focus);
+
+    Scene { objects, outlier_objects, camera }
 }
 
 fn clamp(mut x: f32, min: f32, max: f32) -> f32 {
@@ -106,18 +138,9 @@ fn main() {
     const ROWS: usize = 400;
     const NUM_SAMPLES: usize = 100; // Sample code recommends 100 but this is slow
     const MAX_BOUNCES: usize = 30;
+    const ASPECT_RATIO: f32 = COLS as f32 / ROWS as f32;
 
     println!("Welcome to JDs Rustaceous Raytracer!");
-
-    // Configure the camera
-    const ASPECT_RATIO: f32 = COLS as f32 / ROWS as f32;
-    const APERTURE: f32 = 0.03;
-    const FIELD_OF_VIEW: f32 = 20.0;
-    let eye = Vec3::new(10.0, 1.1, 0.3);
-    let focus = Vec3::new(4.0, 0.55, -0.3);
-    let up = Vec3::new(0.0, 1.0, 0.0);
-    let dist_to_focus = (focus - eye).length();
-    let camera = Camera::new(eye, focus, up, FIELD_OF_VIEW, ASPECT_RATIO, APERTURE, dist_to_focus);
 
     // Set up variables for timing and progress printing
     let max_iterations = COLS * ROWS;
@@ -130,21 +153,19 @@ fn main() {
 
     // Generate the scene
     let scene_index = 1;
-    let mut objects = match scene_index {
-        0 => noise_scene(),
-        _ => random_scene(),
+    let mut scene = match scene_index {
+        0 => noise_scene(ASPECT_RATIO),
+        _ => random_scene(ASPECT_RATIO),
     };
 
     // Split outliers from rest of objects here to improve AABB sizes
     // TODO Figure out better heuristics to this automatically
-    let obj_slice = &mut objects;
-    let n_objects = obj_slice.len();
-    let (obj_slice, outliers) = obj_slice.split_at_mut(n_objects-2);
-    let (globe, obj_slice) = obj_slice.split_at_mut(1);
-    let bvh = BVH::build(obj_slice);
-    let bvh = BVH::glue(bvh, &outliers[0]);
-    let bvh = BVH::glue(bvh, &outliers[1]);
-    let bvh = BVH::glue(bvh, &globe[0]);
+    let obj_slice = &mut scene.objects;
+    let mut bvh = BVH::build(obj_slice);
+    for ref outlier in &scene.outlier_objects {
+        bvh = BVH::glue(bvh, outlier);
+    }
+    let bvh = bvh;
 
     println!("Scene generation done (Took {:.2}s)", start_time.elapsed().as_secs());
     let post_scene_gen_time = std::time::Instant::now();
@@ -161,7 +182,7 @@ fn main() {
             for _s in 0..NUM_SAMPLES {
                 let u = (pu + rng.gen::<f32>()) / COLS as f32;
                 let v = (pv + rng.gen::<f32>()) / ROWS as f32;
-                let ray = camera.clip_to_ray(u, v);
+                let ray = scene.camera.clip_to_ray(u, v);
                 let (ray_colour, ray_count) = raytrace::cast_ray(&ray, &bvh, MAX_BOUNCES);
                 colour += ray_colour;
                 total_rays += ray_count;
