@@ -388,6 +388,119 @@ impl<'a> BVH<'a> {
     }
 }
 
+use super::simdgeometry as simd;
+
+fn to_simd_bounds(bounds: &AABB) -> simd::AABB {
+    let min = simd::new_pos(bounds.min.x, bounds.min.y, bounds.min.z);
+    let max = simd::new_pos(bounds.max.x, bounds.max.y, bounds.max.z);
+    simd::AABB { min, max }
+}
+
+fn from_simd_ray(ray: &simd::Ray) -> Ray {
+    let origin = new_pos(simd::vec_x(ray.origin), simd::vec_y(ray.origin), simd::vec_z(ray.origin));
+    let direction = new_dir(simd::vec_x(ray.direction), simd::vec_y(ray.direction), simd::vec_z(ray.direction));
+    Ray { origin, direction }
+}
+/// A Node in a Bounding Volume Hierarchy.
+/// This is a binary tree that ultimately contains a Hitable
+pub enum SIMDBVH<'a> {
+    Node { bounds: simd::AABB, left: Box<SIMDBVH<'a>>, right: Box<SIMDBVH<'a>> },
+    Leaf { bounds: simd::AABB, object: &'a Box<dyn Hitable> },
+}
+
+impl<'a> SIMDBVH<'a> {
+    fn compare_x_min(a: &Box<dyn Hitable>, b: &Box<dyn Hitable>) -> Ordering {
+        let a_val: f32 = a.bounds().unwrap().min.x;
+        let b_val: f32 = b.bounds().unwrap().min.x;
+        a_val.partial_cmp(&b_val).unwrap()
+    }
+    fn _compare_y_min(a: &Box<dyn Hitable>, b: &Box<dyn Hitable>) -> Ordering {
+        let a_val: f32 = a.bounds().unwrap().min.y;
+        let b_val: f32 = b.bounds().unwrap().min.y;
+        a_val.partial_cmp(&b_val).unwrap()
+    }
+    fn compare_z_min(a: &Box<dyn Hitable>, b: &Box<dyn Hitable>) -> Ordering {
+        let a_val: f32 = a.bounds().unwrap().min.z;
+        let b_val: f32 = b.bounds().unwrap().min.z;
+        a_val.partial_cmp(&b_val).unwrap()
+    }
+    // TODO: Return Result<BVH,String>
+    pub fn build<'b>(objects: &'b mut [Box<dyn Hitable>]) -> SIMDBVH {
+        // Base case of recursion
+        let num_objects = objects.len();
+        if num_objects == 1 {
+            let obj = &objects[0];
+            let bounds = to_simd_bounds(&obj.bounds().expect("BVH can only hold objects with finite bounds"));
+            return SIMDBVH::Leaf { bounds, object: obj };
+        }
+
+        // Choose a random axis, sort objects
+        // Note that we assume objects to be mainly spread around the XZ plane
+        match rand::thread_rng().gen_range(0,2) {
+            0 => objects.sort_unstable_by(Self::compare_x_min),
+            1 => objects.sort_unstable_by(Self::compare_z_min),
+            // 2 => objects.sort_unstable_by(Self::compare_y_min),
+            _ => panic!("Unexpected random number encountered"),
+        };
+
+        // Partition the slice into two lists
+        let (left,right) = objects.split_at_mut(num_objects / 2);
+        let left = Self::build(left);
+        let right = Self::build(right);
+        let bounds = left.bounds().union(right.bounds());
+        SIMDBVH::Node { bounds, left: Box::new(left), right: Box::new(right) }
+    }
+
+    pub fn glue(bvh: SIMDBVH<'a>, object: &'a Box<dyn Hitable>) -> SIMDBVH<'a> {
+        let left = SIMDBVH::Leaf { bounds: to_simd_bounds(&object.bounds().unwrap()), object };
+        let right = bvh;
+        let bounds = left.bounds().union(right.bounds());
+        SIMDBVH::Node { bounds, left: Box::new(left), right: Box::new(right) }
+    }
+
+    fn bounds(&self) -> &simd::AABB {
+        match self {
+            SIMDBVH::Node{bounds, ..} => bounds,
+            SIMDBVH::Leaf{bounds, ..} => bounds,
+        }
+    }
+
+    pub fn hit(&'a self, ray: &simd::Ray, t_min: f32, t_max: f32) -> Option<HitRecord<'a>> {
+        // Bounds check for the clump
+        // Note the full t range; otherwise the segment is inside completely
+        if !self.bounds().hit(&ray, t_min, t_max) {
+            return None;
+        };
+
+        // Thunk to contained object for leaf, and extract subtrees for nodes
+        let (left, right) = match self {
+            SIMDBVH::Leaf{object, ..} => return object.hit(&from_simd_ray(&ray), t_min, t_max),
+            SIMDBVH::Node{ref left, ref right, ..} => (left, right),
+        };
+
+        // Check ray against each subtree
+        let left_result = left.hit(&ray, t_min, t_max);
+        let right_result = right.hit(&ray, t_min, t_max);
+
+        // Tricky logic to return if either or both result is a miss
+        let left_t = match left_result {
+            None => return right_result,
+            Some(ref r) => r.t,
+        };
+        let right_t = match right_result {
+            None => return left_result,
+            Some(ref r) => r.t,
+        };
+        // If both are hits then return the closest
+        if left_t < right_t {
+            left_result
+        }
+        else {
+            right_result
+        }
+    }
+}
+
 pub fn hit<'a>(ray: &Ray, t_min: f32, t_max: f32, objects: &'a [Box<dyn Hitable>]) -> Option<HitRecord<'a>> {
     // // This algorithm seems like the more Rust-like way to do it.
     // // But because it doesn't get to prune future checks based on already seen objects, it is slower.

@@ -1,4 +1,5 @@
 #![deny(bare_trait_objects)]
+#![feature(stdsimd)]
 
 extern crate rand;
 extern crate noise;
@@ -6,6 +7,7 @@ extern crate noise;
 pub mod math;
 pub mod ppm;
 pub mod geometry;
+pub mod simdgeometry;
 pub mod materials;
 
 use math::*;

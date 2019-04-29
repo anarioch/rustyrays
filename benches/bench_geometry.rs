@@ -145,6 +145,21 @@ fn bench_ray_spherescene_bvh_hit(b: &mut Bencher) {
 }
 
 #[bench]
+fn bench_ray_spherescene_bvh_hit2(b: &mut Bencher) {
+    // Given: a grid of objects
+    let mut scene = grid_scene();
+    let bvh = BVH::build(&mut scene);
+
+    // Given: a few rays that do or don't intersect a/some/many objects
+    let ray_x_axis = Ray { origin: Vec3::new(0.5, 0.0, 0.0), direction: Vec3::new(1.0, 0.0, 0.0) };
+
+    b.iter(|| {
+        // Inner closure, the actual test
+        black_box(bvh.hit(black_box(&ray_x_axis), 0.001, 1000.0));
+    });
+}
+
+#[bench]
 fn bench_ray_spherescene_miss(b: &mut Bencher) {
     // Given: a grid of objects
     let scene = grid_scene();
