@@ -187,9 +187,11 @@ impl Material for Dielectric {
         let cosine = ray_dot_norm / ray.direction.len_sq().sqrt();
         let (outward_normal, ni_over_nt, cosine) =
             if ray_dot_norm > 0.0 {
+                // Exiting the material
                 (-hit.normal, self.ref_index, self.ref_index * cosine)
             }
             else {
+                // Entering the material
                 (hit.normal, 1.0 / self.ref_index, -cosine)
             };
         

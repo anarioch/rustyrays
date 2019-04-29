@@ -19,6 +19,10 @@ impl Vec3 {
         Vec3 { x, y, z }
     }
 
+    pub fn splat(v: f32) -> Self {
+        Vec3 { x: v, y: v, z: v }
+    }
+
     #[inline]
     pub fn set(&mut self, x: f32, y: f32, z: f32) {
         self.x = x;
@@ -287,10 +291,26 @@ mod tests {
     fn reflect_vector() {
         let x_axis = Vec3::new(1.0, 0.0, 0.0);
         let y_axis = Vec3::new(0.0, 1.0, 0.0);
-        let dir = Vec3::new(1.0, -1.0, 0.0); // Within the X-Z plane, heading down at 45 degrees
+        let dir = Vec3::new(1.0, -1.0, 0.0); // Within the X-Y plane, heading down at 45 degrees
 
         assert_eq!(reflect(dir, y_axis), Vec3::new(1.0, 1.0, 0.0));
         assert_eq!(reflect(dir, x_axis), Vec3::new(-1.0, -1.0, 0.0));
+    }
+
+    #[test]
+    fn refract_vector() {
+        let r_glass = 1.5;
+        let y_axis = Vec3::new(0.0, 1.0, 0.0);
+
+        // Ray perpindicular to the surface shouldn't bend at all
+        let dir = Vec3::new(0.0, -1.0, 0.0);
+        assert_eq!(refract(dir, y_axis, 1.0/r_glass), Some(dir));
+
+        // Ray at midway angle (45deg)
+        // This angle is not empirically derived, so may be hiding a bug
+        let dir = Vec3::new(1.0, -1.0, 0.0);
+        let refracted = refract(dir, y_axis, 1.0/r_glass).unwrap();
+        assert_eq!(refracted, Vec3::new(0.47140452, -0.8819171, 0.0));
     }
 
     #[test]
