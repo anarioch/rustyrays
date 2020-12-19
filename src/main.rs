@@ -134,9 +134,9 @@ fn clamp(mut x: f32, min: f32, max: f32) -> f32 {
 }
 
 fn main() {
-    const COLS: usize = 400;
-    const ROWS: usize = 400;
-    const NUM_SAMPLES: usize = 100; // Sample code recommends 100 but this is slow
+    const COLS: usize = 800;
+    const ROWS: usize = 800;
+    const NUM_SAMPLES: usize = 100;
     const MAX_BOUNCES: usize = 30;
     const ASPECT_RATIO: f32 = COLS as f32 / ROWS as f32;
 
@@ -171,33 +171,39 @@ fn main() {
     let post_scene_gen_time = std::time::Instant::now();
 
     // Cast rays to generate the image
-    let mut image = PpmImage::create(COLS, ROWS);
     let mut rng = rand::thread_rng();
-    for r in (0..ROWS).rev() {
-        let pv = r as f32;
-        for c in 0..COLS {
-            let pu = c as f32;
-            // Anti-aliased: average colour from multiple randomised samples per pixel
-            let mut colour = Vec3::new(0.0, 0.0, 0.0);
-            for _s in 0..NUM_SAMPLES {
+    let mut img : Vec<Vec3> = Vec::with_capacity(COLS * ROWS);
+    img.resize(COLS * ROWS, Vec3::splat(0.0));
+    for s in 0..NUM_SAMPLES {
+        let mut image = PpmImage::create(COLS, ROWS);
+        for r in (0..ROWS).rev() {
+            let pv = r as f32;
+            for c in 0..COLS {
+                let pu = c as f32;
+                // Anti-aliased: average colour from multiple randomised samples per pixel
                 let u = (pu + rng.gen::<f32>()) / COLS as f32;
                 let v = (pv + rng.gen::<f32>()) / ROWS as f32;
                 let ray = scene.camera.clip_to_ray(u, v);
                 let (ray_colour, ray_count) = raytrace::cast_ray(&ray, &bvh, MAX_BOUNCES);
-                colour += ray_colour;
                 total_rays += ray_count;
-            }
-            colour *= 1.0 / NUM_SAMPLES as f32;
-            // Clamp the colour to [0..1]
-            let colour = colour.map(|x| clamp(x, 0.0, 1.0));
-            // Gamma correction: sqrt the colour
-            let colour = colour.map(|x| x.sqrt());
-            // Output the colour for this pixel
-            image.append_pixel(colour);
 
-            num_iterations += 1;
+                // Add the colour to our accumulator
+                let mut colour = img[COLS * r + c] + ray_colour;
+                img[COLS * r + c] = colour;
+
+                colour *= 1.0 / (s + 1) as f32;
+                // Clamp the colour to [0..1]
+                let colour = colour.map(|x| clamp(x, 0.0, 1.0));
+                // Gamma correction: sqrt the colour
+                let colour = colour.map(|x| x.sqrt());
+                // Output the colour for this pixel
+                image.append_pixel(colour);
+
+                num_iterations += 1;
+            }
+
             if last_time.elapsed().as_secs() >= 1 {
-                let percentage_done = 100.0 * num_iterations as f32 / max_iterations as f32;
+                let percentage_done = 100.0 * num_iterations as f32 / max_iterations as f32 / NUM_SAMPLES as f32;
                 let time_elapsed = post_scene_gen_time.elapsed();
                 let time_elapsed = 1_000_000_000.0 * time_elapsed.as_secs() as f32 + time_elapsed.subsec_nanos() as f32;
                 let time_per_ray = time_elapsed / total_rays as f32;
@@ -206,6 +212,10 @@ fn main() {
                 last_time += std::time::Duration::from_secs(1);
             }
         }
+
+        // Output the image to a file
+        let path = Path::new("out/output.ppm");
+        write_text_to_file(&image.get_text(), &path, false);
     }
 
     let time_elapsed = post_scene_gen_time.elapsed();
@@ -219,13 +229,9 @@ fn main() {
     println!("    Time taken: {:.3}", time_elapsed / 1_000_000_000.0);
     println!("    Rays cast:  {}", total_rays);
     println!("Writing file..");
-
-    // Output the image to a file
-    let path = Path::new("out/output.ppm");
-    write_text_to_file(&image.get_text(), &path);
 }
 
-fn write_text_to_file(text: &str, path: &Path) {
+fn write_text_to_file(text: &str, path: &Path, write_status: bool) {
     let display = path.display();
 
     let mut file = match File::create(&path) {
@@ -234,7 +240,7 @@ fn write_text_to_file(text: &str, path: &Path) {
     };
 
     match file.write_all(text.as_bytes()) {
-        Err(why) => panic!("Failed to create file {}: {}", display, why.description()),
-        Ok(_) => println!("Wrote to file {}!", display),
+        Err(why) => panic!("Failed to write to file {}: {}", display, why.description()),
+        Ok(_) => if write_status {println!("Wrote to file {}!", display) },
     }
 }
