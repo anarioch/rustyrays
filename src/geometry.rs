@@ -323,7 +323,7 @@ impl<'a> BVH<'a> {
 
         // Choose a random axis, sort objects
         // Note that we assume objects to be mainly spread around the XZ plane
-        match rand::thread_rng().gen_range(0,2) {
+        match rand::thread_rng().gen_range(0..2) {
             0 => objects.sort_unstable_by(Self::compare_x_min),
             1 => objects.sort_unstable_by(Self::compare_z_min),
             // 2 => objects.sort_unstable_by(Self::compare_y_min),
@@ -436,7 +436,7 @@ impl<'a> SIMDBVH<'a> {
 
         // Choose a random axis, sort objects
         // Note that we assume objects to be mainly spread around the XZ plane
-        match rand::thread_rng().gen_range(0,2) {
+        match rand::thread_rng().gen_range(0..2) {
             0 => objects.sort_unstable_by(Self::compare_x_min),
             1 => objects.sort_unstable_by(Self::compare_z_min),
             // 2 => objects.sort_unstable_by(Self::compare_y_min),
