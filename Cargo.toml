@@ -14,5 +14,5 @@ lto = true
 [dependencies]
 
 rand = "0.8.0"
-noise = "0.5.1"
-float-cmp = "0.2.1"
+noise = "0.7.0"
+float-cmp = "0.8.0"
