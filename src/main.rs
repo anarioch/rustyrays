@@ -3,7 +3,6 @@
 extern crate raytrace;
 extern crate rand;
 
-use std::error::Error;
 use std::io::prelude::*;
 use std::fs::File;
 use std::path::Path;
@@ -235,12 +234,12 @@ fn write_text_to_file(text: &str, path: &Path, write_status: bool) {
     let display = path.display();
 
     let mut file = match File::create(&path) {
-        Err(why) => panic!("Failed to create file {}: {}", display, why.description()),
+        Err(why) => panic!("Failed to create file {}: {}", display, why),
         Ok(file) => file,
     };
 
     match file.write_all(text.as_bytes()) {
-        Err(why) => panic!("Failed to write to file {}: {}", display, why.description()),
+        Err(why) => panic!("Failed to write to file {}: {}", display, why),
         Ok(_) => if write_status {println!("Wrote to file {}!", display) },
     }
 }

@@ -240,13 +240,13 @@ impl AABB {
     }
 }
 
-fn vec_sub(a: __m128, b: __m128) -> __m128 {
+fn _vec_sub(a: __m128, b: __m128) -> __m128 {
     unsafe {
         _mm_sub_ps(a, b)
     }
 }
 
-fn sphere_ray_intersect(ray: &Ray, t_min: f32, t_max: f32, centre: __m128, radius: f32) -> Option<f32> {
+fn _sphere_ray_intersect(ray: &Ray, _t_min: f32, _t_max: f32, centre: __m128, radius: f32) -> Option<f32> {
     let ray_pos = ray.origin;
     let ray_dir = ray.direction;
     // TODO: This code won't be helped by vectorisation as is.
@@ -261,9 +261,9 @@ fn sphere_ray_intersect(ray: &Ray, t_min: f32, t_max: f32, centre: __m128, radiu
         // This part is scalar math, but doing the same calculation in each vector channel
         // TODO: Implement four-sphere version of this function
         // let discriminant = b * b - 4.0 * a * c;
-        let fourAC = _mm_mul_ps(a, c);
-        let fourAC = _mm_mul_ps(_mm_set1_ps(4.0), fourAC);
-        let discriminant = _mm_fmsub_ps(b, b, fourAC);
+        let four_ac = _mm_mul_ps(a, c);
+        let four_ac = _mm_mul_ps(_mm_set1_ps(4.0), four_ac);
+        let _discriminant = _mm_fmsub_ps(b, b, four_ac);
         // TODO: Translate these scalar ops to SIMD and re-enable
         // if discriminant < 0.0 {
         //     return None
