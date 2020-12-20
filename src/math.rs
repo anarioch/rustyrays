@@ -1,6 +1,6 @@
 use std::ops::{Add,AddAssign,Sub,Mul,MulAssign,Neg};
 
-use rand::{ThreadRng,Rng};
+use rand::prelude::{ThreadRng,Rng};
 
 fn rand_f32(rng: &mut ThreadRng) -> f32 {
     rng.gen::<f32>()
