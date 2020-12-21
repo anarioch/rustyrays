@@ -114,7 +114,7 @@ pub struct HitRecord<'a> {
     pub t: f32,
     pub p: Vec3,
     pub normal: Vec3,
-    pub material: &'a dyn Material,
+    pub material: &'a Material,
 }
 
 pub trait Hitable {
@@ -125,7 +125,7 @@ pub trait Hitable {
 pub struct Sphere {
     pub centre: Vec3,
     pub radius: f32,
-    pub material: Box<dyn Material>,
+    pub material: Material,
 }
 
 fn sphere_ray_intersect(ray: &Ray, t_min: f32, t_max: f32, centre: Vec3, radius: f32) -> Option<f32> {
@@ -158,7 +158,7 @@ impl Hitable for Sphere {
             Some(t) => {
                 let p = ray.at_t(t);
                 let normal = (p - self.centre) * (1.0/self.radius);
-                Some(HitRecord { t, p, normal, material: &*self.material })
+                Some(HitRecord { t, p, normal, material: &self.material })
             },
             None => None,
         }
@@ -182,7 +182,7 @@ pub struct AARect {
     pub b_max: f32,
     pub c: f32,
     pub negate_normal: bool,
-    pub material: Box<dyn Material>,
+    pub material: Material,
 }
 
 impl Hitable for AARect {
@@ -212,7 +212,7 @@ impl Hitable for AARect {
 
         let p = ray.at_t(t);
         let normal = new_dir(0.0, 0.0, if self.negate_normal { -1.0 } else { 1.0 });
-        Some(HitRecord { t, p, normal, material: &*self.material })
+        Some(HitRecord { t, p, normal, material: &self.material })
     }
     fn bounds(&self) -> Option<AABB> {
         const FUDGE: f32 = 0.005; // Give the infinitesimal plane a pretend width for bounds calculations

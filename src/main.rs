@@ -38,10 +38,10 @@ fn random_scene(aspect_ratio: f32) -> Scene {
         let radius = 0.2;
         let mut centre = Vec3::new(x + 0.9 * rand(), 0.0, z + 0.9 * rand());
         centre.y = (rad_sq - centre.x * centre.x).sqrt() - world_radius + radius;
-        let material: Box<dyn Material> = match rand() {
-            d if d < 0.65 => Box::new(Lambertian { albedo: Vec3::new(rand() * rand(), rand() * rand(), rand() * rand()) }),
-            d if d < 0.85 => Box::new(Metal { albedo: Vec3::new(0.5 * (1.0 + rand()), 0.5 * (1.0 + rand()), 0.5 * (1.0 + rand())), fuzz: 0.5 * rand() }),
-            _ => Box::new(Dielectric { ref_index: 1.5 }),
+        let material: Material = match rand() {
+            d if d < 0.65 => Material::Lambertian { albedo: Vec3::new(rand() * rand(), rand() * rand(), rand() * rand()) },
+            d if d < 0.85 => Material::Metal { albedo: Vec3::new(0.5 * (1.0 + rand()), 0.5 * (1.0 + rand()), 0.5 * (1.0 + rand())), fuzz: 0.5 * rand() },
+            _ => Material::Dielectric { ref_index: 1.5 },
         };
         Sphere { centre, radius, material }
     };
@@ -53,38 +53,38 @@ fn random_scene(aspect_ratio: f32) -> Scene {
     }
 
     // Three feature spheres, showing off some of the materials
-    // let reddish = Box::new(Lambertian { albedo: Box::new(ConstantTexture { colour: Vec3::new(0.7, 0.2, 0.3) }) });
-    let gold = Box::new(Metal { albedo: Vec3::new(0.8, 0.6, 0.2), fuzz: 0.0 });
-    let marble = Box::new(PolishedStone { albedo: Box::new(NoiseTexture::new(12.0, Vec3::new(0.6, 0.1, 0.2))) });
-    let glass = Box::new(Dielectric { ref_index: 1.5 });
+    // let reddish = Material::Lambertian { albedo: Box::new(ConstantTexture { colour: Vec3::new(0.7, 0.2, 0.3) }) };
+    let gold = Material::Metal { albedo: Vec3::new(0.8, 0.6, 0.2), fuzz: 0.0 };
+    let marble = Material::PolishedStone { albedo: Box::new(NoiseTexture::new(12.0, Vec3::new(0.6, 0.1, 0.2))) };
+    let glass = Material::Dielectric { ref_index: 1.5 };
     objects.push(Box::new(Sphere { centre: Vec3::new(-4.0, 0.5, -1.0), radius: 0.5, material: gold }));
     objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 0.5, -1.0), radius: 0.5, material: glass }));
     objects.push(Box::new(Sphere { centre: Vec3::new(4.0, 0.5, -1.0), radius: 0.5, material: marble }));
 
     // A glowing orb up above all other objects to light the scene
-    let bulb = Box::new(DiffuseLight { emission_colour: Vec3::new(2.0, 2.0, 2.0) });
+    let bulb = Material::DiffuseLight { emission_colour: Vec3::new(2.0, 2.0, 2.0) };
     outlier_objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 10.0, -1.0), radius: 5.0, material: bulb }));
 
     // Neat trick: embed a small sphere in another to simulate glass.  Might work by reversing coefficient also
-    // let glass2 = Box::new(Dielectric { ref_index: 1.5 });
+    // let glass2 = Material::Dielectric { ref_index: 1.5 };
     // objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 0.0, -1.0), radius: 0.5, material: glass }));
     // objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 0.0, -1.0), radius: -0.45, material: glass2 }));
 
     // A gold wall
-    let brushed_gold = Box::new(Metal { albedo: Vec3::new(1.0, 0.85, 0.0), fuzz: 0.3 });
-    // let brushed_copper = Box::new(Metal { albedo: Vec3::new(0.7, 0.45, 0.2), fuzz: 0.3 });
+    let brushed_gold = Material::Metal { albedo: Vec3::new(1.0, 0.85, 0.0), fuzz: 0.3 };
+    // let brushed_copper = Material::Metal { albedo: Vec3::new(0.7, 0.45, 0.2), fuzz: 0.3 };
     outlier_objects.push(Box::new(AARect { which: AARectWhich::XY, a_min: -4.0, a_max: 4.0, b_min: -4.0, b_max: 1.3, c: -1.7, negate_normal: false, material: brushed_gold}));
 
     // The giant world sphere on which all others sit
     let globe_texture = CheckerTexture {
         check_size: 10.0,
-        odd: Box::new(ConstantTexture { colour: Vec3::new(0.2, 0.3, 0.1) }),
-        even: Box::new(ConstantTexture { colour: Vec3::new(0.9, 0.9, 0.9) }),
+        odd: Vec3::new(0.2, 0.3, 0.1),
+        even: Vec3::new(0.9, 0.9, 0.9),
     };
     outlier_objects.push(Box::new(Sphere {
         centre: world_centre,
         radius: world_radius,
-        material: Box::new(TexturedLambertian { albedo: Box::new(globe_texture) }),
+        material: Material::TexturedLambertian { albedo: Box::new(globe_texture) },
     }));
 
     // Configure the camera
@@ -104,14 +104,14 @@ fn noise_scene(aspect_ratio: f32) -> Scene {
     let mut outlier_objects : Vec<Box<dyn Hitable>> = Vec::new();
 
     // The giant world sphere on which all others sit
-    let noise1 = Box::new(TexturedLambertian { albedo: Box::new(NoiseTexture::new(4.0, Vec3::new(1.0, 1.0, 1.0))) });
+    let noise1 = Material::TexturedLambertian { albedo: Box::new(NoiseTexture::new(4.0, Vec3::new(1.0, 1.0, 1.0))) };
     outlier_objects.push(Box::new(Sphere {
         centre: Vec3::new(0.0, -1000.5, -2.0),
         radius: 1000.0,
         material: noise1,
     }));
 
-    let marble = Box::new(PolishedStone { albedo: Box::new(NoiseTexture::new(12.0, Vec3::new(0.6, 0.2, 0.1))) });
+    let marble = Material::PolishedStone { albedo: Box::new(NoiseTexture::new(12.0, Vec3::new(0.6, 0.2, 0.1))) };
     objects.push(Box::new(Sphere { centre: Vec3::new(4.0, 0.0, -1.0), radius: 0.5, material: marble }));
 
     // Configure the camera

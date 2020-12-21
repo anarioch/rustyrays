@@ -74,8 +74,8 @@ pub fn cast_ray(ray: &Ray, object: &BVH, depth: usize) -> (Vec3, usize) {
             if depth == 0 {
                 return (Vec3::new(0.0, 0.0, 0.0), 1);
             }
-            let emission = record.material.emit();
-            match record.material.scatter(&ray, &record) {
+            let emission = materials::emit(record.material);
+            match materials::scatter(&ray, &record) {
                 Some(scatter) => {
                     let (recurse,count) = cast_ray(&scatter.scattered, &object, depth - 1);
                     (emission + scatter.attenuation.mul_vec(recurse), count + 1)

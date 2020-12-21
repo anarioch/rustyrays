@@ -23,19 +23,19 @@ impl Texture for ConstantTexture {
 
 pub struct CheckerTexture {
     pub check_size: f32,
-    pub odd: Box<dyn Texture>,
-    pub even: Box<dyn Texture>,
+    pub odd: Vec3,
+    pub even: Vec3,
 }
 
 impl Texture for CheckerTexture {
-    fn value(&self, u: f32, v: f32, p: Vec3) -> Vec3 {
+    fn value(&self, _u: f32, _v: f32, p: Vec3) -> Vec3 {
         let sines = (self.check_size * p).map(|x| x.sin());
         let sines = sines.x * sines.y * sines.z;
         if sines < 0.0 {
-            self.odd.value(u, v, p)
+            self.odd
         }
         else {
-            self.even.value(u, v, p)
+            self.even
         }
     }
 }
@@ -80,95 +80,88 @@ pub struct ScatterResult {
     pub scattered: Ray,
 }
 
-pub trait Material {
-    fn scatter(&self, ray: &Ray, hit: &HitRecord) -> Option<ScatterResult>;
-    fn emit(&self) -> Vec3 {
-        Vec3::new(0.0, 0.0, 0.0)
+pub enum Material {
+    Invisible,
+    Lambertian {
+        albedo: Vec3
+    },
+    TexturedLambertian {
+        albedo: Box<dyn Texture>
+    },
+    Metal {
+        albedo: Vec3,
+        fuzz: f32,
+    },
+    PolishedStone {
+        albedo: Box<dyn Texture>,
+    },
+    Dielectric {
+        ref_index: f32,
+    },
+    DiffuseLight {
+        emission_colour: Vec3,
     }
 }
 
-pub struct Invisible {
-    // Nothing here
+pub fn scatter(ray: &Ray, hit: &HitRecord) -> Option<ScatterResult> {
+    match hit.material {
+        Material::Invisible => None,
+        Material::Lambertian { albedo } =>
+            lambertian_scatter(*albedo, hit.p, hit.normal),
+        Material::TexturedLambertian { albedo } =>
+            lambertian_scatter(albedo.value(0.0, 0.0, hit.p), hit.p, hit.normal),
+        Material::Metal { albedo, fuzz } =>
+            metal_scatter(*albedo, *fuzz, ray.direction, hit.p, hit.normal),
+        Material::PolishedStone { albedo } =>
+            polished_stone_scatter(&**albedo, ray.direction, hit.p, hit.normal),
+        Material::Dielectric { ref_index } =>
+            dielectric_scatter(*ref_index, ray.direction, hit.p, hit.normal),
+        Material::DiffuseLight { emission_colour: _ } => None,
+    }
 }
 
-impl Material for Invisible {
-    fn scatter(&self, _ray: &Ray, _hit: &HitRecord) -> Option<ScatterResult>{
+pub fn emit(material: &Material) -> Vec3 {
+    match material {
+        Material::DiffuseLight { ref emission_colour } => *emission_colour,
+        _ => Vec3::new(0.0, 0.0, 0.0)
+    }
+}
+
+fn lambertian_scatter(albedo: Vec3, p: Vec3, normal: Vec3) -> Option<ScatterResult> {
+    let target = p + normal + Vec3::random_in_unit_sphere(&mut rand::thread_rng());
+    let dir = target - p;
+    let attenuation = albedo;
+    let scattered = Ray { origin: p, direction: dir };
+    Some(ScatterResult { attenuation, scattered})
+}
+
+fn metal_scatter(albedo: Vec3, fuzz: f32, ray_dir: Vec3, p: Vec3, normal: Vec3) -> Option<ScatterResult> {
+    let reflected = reflect(ray_dir.normalise(), normal);
+    let reflected = reflected + fuzz * Vec3::random_in_unit_sphere(&mut rand::thread_rng());
+    if dot(reflected, normal) > 0.0 {
+        let scattered = Ray { origin: p, direction: reflected };
+        Some(ScatterResult { attenuation: albedo, scattered})
+    }
+    else {
         None
     }
 }
 
-pub struct Lambertian {
-    pub albedo: Vec3,
-}
-
-impl Material for Lambertian {
-    fn scatter(&self, _ray: &Ray, hit: &HitRecord) -> Option<ScatterResult> {
-        let target = hit.p + hit.normal + Vec3::random_in_unit_sphere(&mut rand::thread_rng());
-        let dir = target - hit.p;
-        let attenuation = self.albedo;
-        let scattered = Ray { origin: hit.p, direction: dir };
-        Some(ScatterResult { attenuation, scattered})
+fn polished_stone_scatter(albedo: &dyn Texture, ray_dir: Vec3, p: Vec3, normal: Vec3) -> Option<ScatterResult> {
+    let mut rng = rand::thread_rng();
+    let reflected = reflect(ray_dir.normalise(), normal);
+    let dotty = dot(reflected, normal);
+    let reflect_prob = 1.0 - dotty.sqrt();
+    let (attenuation, direction) = if rng.gen::<f32>() < reflect_prob {
+        (Vec3::new(1.0, 1.0, 1.0), reflected)
     }
-}
-
-pub struct TexturedLambertian {
-    pub albedo: Box<dyn Texture>,
-}
-
-impl Material for TexturedLambertian {
-    fn scatter(&self, _ray: &Ray, hit: &HitRecord) -> Option<ScatterResult> {
-        let target = hit.p + hit.normal + Vec3::random_in_unit_sphere(&mut rand::thread_rng());
-        let dir = target - hit.p;
-        let attenuation = self.albedo.value(0.0, 0.0, hit.p);
-        let scattered = Ray { origin: hit.p, direction: dir };
-        Some(ScatterResult { attenuation, scattered})
-    }
-}
-
-pub struct Metal {
-    pub albedo: Vec3,
-    pub fuzz: f32,
-}
-
-impl Material for Metal {
-    fn scatter(&self, ray: &Ray, hit: &HitRecord) -> Option<ScatterResult> {
-        let reflected = reflect(ray.direction.normalise(), hit.normal);
-        let reflected = reflected + self.fuzz * Vec3::random_in_unit_sphere(&mut rand::thread_rng());
-        if dot(reflected, hit.normal) > 0.0 {
-            let scattered = Ray { origin: hit.p, direction: reflected };
-            Some(ScatterResult { attenuation: self.albedo, scattered})
-        }
-        else {
-            None
-        }
-    }
-}
-
-pub struct PolishedStone {
-    pub albedo: Box<dyn Texture>,
-}
-
-impl Material for PolishedStone {
-    fn scatter(&self, ray: &Ray, hit: &HitRecord) -> Option<ScatterResult> {
-        let mut rng = rand::thread_rng();
-        let reflected = reflect(ray.direction.normalise(), hit.normal);
-        let dotty = dot(reflected, hit.normal);
-        let reflect_prob = 1.0 - dotty.sqrt();
-        let (attenuation, direction) = if rng.gen::<f32>() < reflect_prob {
-            (Vec3::new(1.0, 1.0, 1.0), reflected)
-        }
-        else {
-            let attenuation = self.albedo.value(0.0, 0.0, hit.p);
-            let scattered = hit.normal + Vec3::random_in_unit_sphere(&mut rng);
-            (attenuation, scattered)
-        };
-        let scattered = Ray { origin: hit.p, direction };
-        Some(ScatterResult { attenuation, scattered})
-    }
-}
-
-pub struct Dielectric {
-    pub ref_index: f32,
+    else {
+        let attenuation = albedo.value(0.0, 0.0, p);
+        let scattered = normal + Vec3::random_in_unit_sphere(&mut rng);
+        (attenuation, scattered)
+    };
+    let scattered = Ray { origin: p, direction };
+    Some(ScatterResult { attenuation, scattered})
 }
 
 fn schlick(cosine: f32, ref_index: f32) -> f32 {
@@ -177,54 +170,39 @@ fn schlick(cosine: f32, ref_index: f32) -> f32 {
     r0 + (1.0 - r0) * (1.0 - cosine).powi(5)
 }
 
-impl Material for Dielectric {
-    fn scatter(&self, ray: &Ray, hit: &HitRecord) -> Option<ScatterResult> {
-        let dir = ray.direction.normalise();
-        let reflected = reflect(dir, hit.normal);
-        let attenuation = Vec3::new(1.0, 1.0, 1.0);
+fn dielectric_scatter(ref_index: f32, ray_dir: Vec3, p: Vec3, normal: Vec3) -> Option<ScatterResult> {
+    let dir = ray_dir.normalise();
+    let reflected = reflect(dir, normal);
+    let attenuation = Vec3::new(1.0, 1.0, 1.0);
 
-        let ray_dot_norm = dot(ray.direction, hit.normal);
-        let cosine = ray_dot_norm / ray.direction.len_sq().sqrt();
-        let (outward_normal, ni_over_nt, cosine) =
-            if ray_dot_norm > 0.0 {
-                // Exiting the material
-                (-hit.normal, self.ref_index, self.ref_index * cosine)
-            }
-            else {
-                // Entering the material
-                (hit.normal, 1.0 / self.ref_index, -cosine)
-            };
-        
-        let (refracted, reflect_prob) =
-            match refract(dir, outward_normal, ni_over_nt) {
-                Some(refracted) => {
-                    (refracted, schlick(cosine, self.ref_index))
-                },
-                None => (Vec3::new(0.0, 0.0, 0.0), 1.0)
-            };
-        let ray_dir = 
-            if rand::thread_rng().gen::<f32>() < reflect_prob {
-                reflected
-            }
-            else {
-                refracted
-            };
-        let scattered = Ray { origin: hit.p, direction: ray_dir };
-        Some(ScatterResult { attenuation, scattered })
-    }
-}
-
-pub struct DiffuseLight {
-    pub emission_colour: Vec3,
-}
-
-impl Material for DiffuseLight {
-    fn scatter(&self, _ray: &Ray, _hit: &HitRecord) -> Option<ScatterResult> {
-        None
-    }
-    fn emit(&self) -> Vec3 {
-        self.emission_colour
-    }
+    let ray_dot_norm = dot(ray_dir, normal);
+    let cosine = ray_dot_norm / ray_dir.len_sq().sqrt();
+    let (outward_normal, ni_over_nt, cosine) =
+        if ray_dot_norm > 0.0 {
+            // Exiting the material
+            (-normal, ref_index, ref_index * cosine)
+        }
+        else {
+            // Entering the material
+            (normal, 1.0 / ref_index, -cosine)
+        };
+    
+    let (refracted, reflect_prob) =
+        match refract(dir, outward_normal, ni_over_nt) {
+            Some(refracted) => {
+                (refracted, schlick(cosine, ref_index))
+            },
+            None => (Vec3::new(0.0, 0.0, 0.0), 1.0)
+        };
+    let ray_dir = 
+        if rand::thread_rng().gen::<f32>() < reflect_prob {
+            reflected
+        }
+        else {
+            refracted
+        };
+    let scattered = Ray { origin: p, direction: ray_dir };
+    Some(ScatterResult { attenuation, scattered })
 }
 
 #[cfg(test)]
@@ -235,29 +213,30 @@ mod tests {
     #[test]
     fn scatter_lambertian() {
         // Given:
-        let material = Lambertian { albedo: Vec3::new(1.0, 0.0, 0.0) };
+        let red = Vec3::new(1.0, 0.0, 0.0);
+        let material = Material::Lambertian { albedo: red };
         let ray = Ray { origin: Vec3::new(1.0, 1.0, 0.0), direction: Vec3::new(-1.0, 0.0, 0.0) };
         let hit = HitRecord { t: 0.5, p: Vec3::new(0.0, 1.0, 1.0), normal: Vec3::new(0.0, 1.0, 0.0), material: &material };
 
         // When: We scatter off the material
-        let res = material.scatter(&ray, &hit);
+        let res = scatter(&ray, &hit);
 
         // Then: the result is not None
         let res = res.unwrap();
 
         // Then: the attenuation is the red that we defined on the material
-        assert_eq!(res.attenuation, material.albedo);
+        assert_eq!(res.attenuation, red);
     }
 
     #[test]
     fn scatter_metal() {
         // Given:
-        let material = Metal { albedo: Vec3::new(1.0, 0.0, 0.0), fuzz: 0.0 };
+        let material = Material::Metal { albedo: Vec3::new(1.0, 0.0, 0.0), fuzz: 0.0 };
         let ray = Ray { origin: Vec3::new(-1.0, 2.0, 0.0), direction: Vec3::new(1.0, -1.0, 0.0) };
         let hit = HitRecord { t: 0.5, p: Vec3::new(0.0, 1.0, 1.0), normal: Vec3::new(0.0, 1.0, 0.0), material: &material };
 
         // When: We scatter off the material
-        let res = material.scatter(&ray, &hit);
+        let res = scatter(&ray, &hit);
 
         // Then: the result is not None
         let res = res.unwrap();
@@ -271,12 +250,12 @@ mod tests {
     #[test]
     fn scatter_dielectric() {
         // Given:
-        let material = Dielectric { ref_index: 1.5 };
+        let material = Material::Dielectric { ref_index: 1.5 };
         let ray = Ray { origin: Vec3::new(-1.0, 2.0, 0.0), direction: Vec3::new(1.0, -1.0, 0.0) };
         let hit = HitRecord { t: 0.5, p: Vec3::new(0.0, 1.0, 1.0), normal: Vec3::new(0.0, 1.0, 0.0), material: &material };
 
         // When: We scatter off the material
-        let res = material.scatter(&ray, &hit);
+        let res = scatter(&ray, &hit);
 
         // Then: the result is not None
         let res = res.unwrap();
