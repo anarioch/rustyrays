@@ -30,8 +30,15 @@ struct CameraDeclaration {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+struct SphereDeclaration {
+    centre: Vec3,
+    radius: f32,
+    material: String
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 struct SceneDeclaration {
-    //objects: Vec<Box<dyn Hitable>>,
+    objects: Vec<SphereDeclaration>,
     //outlier_objects: Vec<Box<dyn Hitable>>,
     camera: CameraDeclaration
 }
@@ -67,7 +74,7 @@ struct Scene {
     camera: Camera,
 }
 
-fn load_scene(aspect_ratio: f32, camera_spec: &CameraDeclaration) -> Scene {
+fn load_scene(aspect_ratio: f32, scene_spec: &SceneDeclaration) -> Scene {
     let mut objects : Vec<Box<dyn Hitable>> = Vec::new();
     let mut outlier_objects : Vec<Box<dyn Hitable>> = Vec::new();
     let mut rng = rand::thread_rng();
@@ -96,18 +103,16 @@ fn load_scene(aspect_ratio: f32, camera_spec: &CameraDeclaration) -> Scene {
         }
     }
 
-    // Three feature spheres, showing off some of the materials
-    // let reddish = Material::Lambertian { albedo: Box::new(ConstantTexture { colour: Vec3::new(0.7, 0.2, 0.3) }) };
-    let gold = Material::Metal { albedo: Vec3::new(0.8, 0.6, 0.2), fuzz: 0.0 };
-    let marble = Material::PolishedStone { albedo: Box::new(NoiseTexture::new(12.0, Vec3::new(0.6, 0.1, 0.2))) };
-    let glass = Material::Dielectric { ref_index: 1.5 };
-    objects.push(Box::new(Sphere { centre: Vec3::new(-4.0, 0.5, -1.0), radius: 0.5, material: gold }));
-    objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 0.5, -1.0), radius: 0.5, material: glass }));
-    objects.push(Box::new(Sphere { centre: Vec3::new(4.0, 0.5, -1.0), radius: 0.5, material: marble }));
-
-    // A glowing orb up above all other objects to light the scene
-    let bulb = Material::DiffuseLight { emission_colour: Vec3::new(2.0, 2.0, 2.0) };
-    outlier_objects.push(Box::new(Sphere { centre: Vec3::new(0.0, 10.0, -1.0), radius: 5.0, material: bulb }));
+    let m = |mat: &str| match mat {
+        "gold" => Material::Metal { albedo: Vec3::new(0.8, 0.6, 0.2), fuzz: 0.0 },
+        "marble" => Material::PolishedStone { albedo: Box::new(NoiseTexture::new(12.0, Vec3::new(0.6, 0.1, 0.2))) },
+        "glass" => Material::Dielectric { ref_index: 1.5 },
+        "glow_white" => Material::DiffuseLight { emission_colour: Vec3::new(2.0, 2.0, 2.0) },
+        _ => Material::TexturedLambertian { albedo: Box::new(CheckerTexture { check_size: 20.0, odd: Vec3::splat(0.0), even: Vec3::splat(1.0) }) }
+    };
+    for obj in &scene_spec.objects {
+        objects.push(Box::new(Sphere { centre: obj.centre, radius: obj.radius, material: m(obj.material.as_ref()) }));
+    }
 
     // Neat trick: embed a small sphere in another to simulate glass.  Might work by reversing coefficient also
     // let glass2 = Material::Dielectric { ref_index: 1.5 };
@@ -132,13 +137,14 @@ fn load_scene(aspect_ratio: f32, camera_spec: &CameraDeclaration) -> Scene {
     }));
 
     // Configure the camera
+    let camera_spec = &scene_spec.camera;
     let dist_to_focus = (camera_spec.focus - camera_spec.eye).length();
     let camera = Camera::new(camera_spec.eye, camera_spec.focus, camera_spec.up, camera_spec.vertical_fov, aspect_ratio, camera_spec.aperture, dist_to_focus);
 
     Scene { objects, outlier_objects, camera }
 }
 
-fn random_scene(aspect_ratio: f32, camera_spec: &CameraDeclaration) -> Scene {
+fn random_scene(aspect_ratio: f32) -> Scene {
     let mut objects : Vec<Box<dyn Hitable>> = Vec::new();
     let mut outlier_objects : Vec<Box<dyn Hitable>> = Vec::new();
     let mut rng = rand::thread_rng();
@@ -267,7 +273,7 @@ fn main() {
     let mut scene = match scene_index {
         0 => noise_scene(aspect_ratio),
         1 => random_scene(aspect_ratio),
-        _ => load_scene(aspect_ratio, &params.scene.camera),
+        _ => load_scene(aspect_ratio, &params.scene),
     };
 
     // Split outliers from rest of objects here to improve AABB sizes

@@ -4,6 +4,28 @@
     "samples_per_pixel": 100,
     "max_bounces": 30,
     "scene": {
+        "objects": [
+            {
+                "centre": { "x": -4.0, "y": 0.4, "z": -1.0 },
+                "radius": 0.5,
+                "material": "gold"
+            },
+            {
+                "centre": { "x": 0.0, "y": 0.4, "z": -1.0 },
+                "radius": 0.5,
+                "material": "marble"
+            },
+            {
+                "centre": { "x": 4.0, "y": 0.4, "z": -1.0 },
+                "radius": 0.5,
+                "material": "glass"
+            },
+            {
+                "centre": { "x": 0.0, "y": 10.0, "z": -1.0 },
+                "radius": 5.0,
+                "material": "glow_white"
+            }
+        ],
         "camera": {
             "eye": { "x": 10.0, "y": 1.1, "z": 0.3 },
             "focus": { "x": 4.0, "y": 0.55, "z": -0.3 },
