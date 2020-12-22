@@ -2,5 +2,14 @@
     "cols": 800,
     "rows": 800,
     "samples_per_pixel": 100,
-    "max_bounces": 30
+    "max_bounces": 30,
+    "scene": {
+        "camera": {
+            "eye": { "x": 10.0, "y": 1.1, "z": 0.3 },
+            "focus": { "x": 4.0, "y": 0.55, "z": -0.3 },
+            "up": { "x": 0.0, "y": 1.0, "z": 0.0 },
+            "vertical_fov": 20.0,
+            "aperture": 0.03
+        }
+    }
 }

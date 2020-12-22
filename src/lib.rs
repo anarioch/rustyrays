@@ -3,6 +3,7 @@
 
 extern crate rand;
 extern crate noise;
+extern crate serde;
 
 pub mod math;
 pub mod ppm;

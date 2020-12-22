@@ -2,11 +2,13 @@ use std::ops::{Add,AddAssign,Sub,Mul,MulAssign,Neg};
 
 use rand::prelude::{ThreadRng,Rng};
 
+use serde::{Deserialize, Serialize};
+
 fn rand_f32(rng: &mut ThreadRng) -> f32 {
     rng.gen::<f32>()
 }
 
-#[derive(PartialEq,Debug,Clone,Copy)]
+#[derive(PartialEq, Debug, Clone, Copy, Deserialize, Serialize)]
 pub struct Vec3 {
     pub x: f32,
     pub y: f32,
