@@ -2,12 +2,18 @@
 
 extern crate raytrace;
 extern crate rand;
+extern crate serde;
 
-use std::io::prelude::*;
+
+use std::error::Error;
 use std::fs::File;
+use std::io::prelude::*;
+use std::io::BufReader;
 use std::path::Path;
 
 use rand::Rng;
+
+use serde::{Deserialize, Serialize};
 
 use raytrace::math::*;
 use raytrace::ppm::PpmImage;
@@ -132,17 +138,34 @@ fn clamp(mut x: f32, min: f32, max: f32) -> f32 {
     x
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+struct TargetParameters {
+    cols: usize,
+    rows: usize,
+    samples_per_pixel: usize,
+    max_bounces: usize
+}
+
+fn read_params_from_file<P: AsRef<Path>>(path: P) -> Result<TargetParameters, Box<dyn Error>> {
+    // Open the file in read-only mode with buffer.
+    let file = File::open(path)?;
+    let reader = BufReader::new(file);
+
+    // Read the JSON contents of the file as an instance of `TargetParameters`.
+    let params = serde_json::from_reader(reader)?;
+
+    // Return the `TargetParameters`.
+    Ok(params)
+}
+
 fn main() {
-    const COLS: usize = 800;
-    const ROWS: usize = 800;
-    const NUM_SAMPLES: usize = 100;
-    const MAX_BOUNCES: usize = 30;
-    const ASPECT_RATIO: f32 = COLS as f32 / ROWS as f32;
+    let params: TargetParameters = read_params_from_file("params.json").unwrap();
+    let aspect_ratio: f32 = params.cols as f32 / params.rows as f32;
 
     println!("Welcome to JDs Rustaceous Raytracer!");
 
     // Set up variables for timing and progress printing
-    let max_iterations = COLS * ROWS;
+    let max_iterations = params.cols * params.rows;
     let mut num_iterations = 0;
     let start_time = std::time::Instant::now();
     let mut last_time = std::time::Instant::now();
@@ -153,8 +176,8 @@ fn main() {
     // Generate the scene
     let scene_index = 1;
     let mut scene = match scene_index {
-        0 => noise_scene(ASPECT_RATIO),
-        _ => random_scene(ASPECT_RATIO),
+        0 => noise_scene(aspect_ratio),
+        _ => random_scene(aspect_ratio),
     };
 
     // Split outliers from rest of objects here to improve AABB sizes
@@ -171,24 +194,24 @@ fn main() {
 
     // Cast rays to generate the image
     let mut rng = rand::thread_rng();
-    let mut img : Vec<Vec3> = Vec::with_capacity(COLS * ROWS);
-    img.resize(COLS * ROWS, Vec3::splat(0.0));
-    for s in 0..NUM_SAMPLES {
-        let mut image = PpmImage::create(COLS, ROWS);
-        for r in (0..ROWS).rev() {
+    let mut img : Vec<Vec3> = Vec::with_capacity(params.cols * params.rows);
+    img.resize(params.cols * params.rows, Vec3::splat(0.0));
+    for s in 0..params.samples_per_pixel {
+        let mut image = PpmImage::create(params.cols, params.rows);
+        for r in (0..params.rows).rev() {
             let pv = r as f32;
-            for c in 0..COLS {
+            for c in 0..params.cols {
                 let pu = c as f32;
                 // Anti-aliased: average colour from multiple randomised samples per pixel
-                let u = (pu + rng.gen::<f32>()) / COLS as f32;
-                let v = (pv + rng.gen::<f32>()) / ROWS as f32;
+                let u = (pu + rng.gen::<f32>()) / params.cols as f32;
+                let v = (pv + rng.gen::<f32>()) / params.rows as f32;
                 let ray = scene.camera.clip_to_ray(u, v);
-                let (ray_colour, ray_count) = raytrace::cast_ray(&ray, &bvh, MAX_BOUNCES);
+                let (ray_colour, ray_count) = raytrace::cast_ray(&ray, &bvh, params.max_bounces);
                 total_rays += ray_count;
 
                 // Add the colour to our accumulator
-                let mut colour = img[COLS * r + c] + ray_colour;
-                img[COLS * r + c] = colour;
+                let mut colour = img[params.cols * r + c] + ray_colour;
+                img[params.cols * r + c] = colour;
 
                 colour *= 1.0 / (s + 1) as f32;
                 // Clamp the colour to [0..1]
@@ -202,7 +225,7 @@ fn main() {
             }
 
             if last_time.elapsed().as_secs() >= 1 {
-                let percentage_done = 100.0 * num_iterations as f32 / max_iterations as f32 / NUM_SAMPLES as f32;
+                let percentage_done = 100.0 * num_iterations as f32 / max_iterations as f32 / params.samples_per_pixel as f32;
                 let time_elapsed = post_scene_gen_time.elapsed();
                 let time_elapsed = 1_000_000_000.0 * time_elapsed.as_secs() as f32 + time_elapsed.subsec_nanos() as f32;
                 let time_per_ray = time_elapsed / total_rays as f32;
@@ -221,9 +244,9 @@ fn main() {
     let time_elapsed = 1_000_000_000.0 * time_elapsed.as_secs() as f32 + time_elapsed.subsec_nanos() as f32;
     let time_per_ray = time_elapsed / total_rays as f32;
     println!("\rProcessing done.                                                ");
-    println!("    Rows:       {}", ROWS);
-    println!("    Columns:    {}", COLS);
-    println!("    Rays/pixel: {}", NUM_SAMPLES);
+    println!("    Rows:       {}", params.rows);
+    println!("    Columns:    {}", params.cols);
+    println!("    Rays/pixel: {}", params.samples_per_pixel);
     println!("    ns/ray:     {:.1}", time_per_ray);
     println!("    Time taken: {:.3}", time_elapsed / 1_000_000_000.0);
     println!("    Rays cast:  {}", total_rays);
