@@ -3,6 +3,7 @@
 extern crate raytrace;
 extern crate rand;
 extern crate serde;
+extern crate serde_json;
 
 use std::error::Error;
 use std::fs::File;
@@ -39,7 +40,7 @@ struct SphereDeclaration {
 #[derive(Debug, Deserialize, Serialize)]
 struct SceneDeclaration {
     objects: Vec<SphereDeclaration>,
-    //outlier_objects: Vec<Box<dyn Hitable>>,
+    outlier_objects: Vec<SphereDeclaration>,
     camera: CameraDeclaration
 }
 
@@ -74,41 +75,54 @@ struct Scene {
     camera: Camera,
 }
 
+fn gen_sphere_grid() {
+    let mut rng = rand::thread_rng();
+    let mut rand = || rng.gen::<f32>();
+
+    let world_radius = 1000.0;
+
+    // Create closure that creates a randomised sphere within the x,z unit cell
+    let rad_sq = world_radius * world_radius;
+    let mut random_sphere = |x, z| {
+        // let radius = 0.2;
+        let radius = 0.15 + 0.1 * rand();
+        let mut centre = Vec3::new(x + 0.9 * rand(), 0.0, z + 0.9 * rand());
+        centre.y = (rad_sq - centre.x * centre.x).sqrt() - world_radius + radius;
+        let mat = match rand() {
+            d if d < 0.65 => "rand_lambertian",
+            d if d < 0.85 => "rand_metal",
+            _ => "glass",
+        };
+        SphereDeclaration {centre, radius, material: mat.to_owned()}
+    };
+
+    let mut dec: Vec<SphereDeclaration> = Vec::new();
+    for a in -7..7 {
+        for b in -7..7 {
+            dec.push(random_sphere(a as f32, b as f32));
+        }
+    }
+
+    let ss = serde_json::to_string(&dec).unwrap();
+    let path = Path::new("sphere_grid.json");
+    write_text_to_file(&ss, &path, true);
+}
+
 fn load_scene(aspect_ratio: f32, scene_spec: &SceneDeclaration) -> Scene {
     let mut objects : Vec<Box<dyn Hitable>> = Vec::new();
     let mut outlier_objects : Vec<Box<dyn Hitable>> = Vec::new();
     let mut rng = rand::thread_rng();
     let mut rand = || rng.gen::<f32>();
 
-    let world_centre = Vec3::new(0.0, -1000.0, 0.0);
-    let world_radius = 1000.0;
-
-    // Create closure that creates a randomised sphere within the x,z unit cell
-    let rad_sq = world_radius * world_radius;
-    let mut random_sphere = |x, z| {
-        let radius = 0.2;
-        let mut centre = Vec3::new(x + 0.9 * rand(), 0.0, z + 0.9 * rand());
-        centre.y = (rad_sq - centre.x * centre.x).sqrt() - world_radius + radius;
-        let material: Material = match rand() {
-            d if d < 0.65 => Material::Lambertian { albedo: Vec3::new(rand() * rand(), rand() * rand(), rand() * rand()) },
-            d if d < 0.85 => Material::Metal { albedo: Vec3::new(0.5 * (1.0 + rand()), 0.5 * (1.0 + rand()), 0.5 * (1.0 + rand())), fuzz: 0.5 * rand() },
-            _ => Material::Dielectric { ref_index: 1.5 },
-        };
-        Sphere { centre, radius, material }
-    };
-
-    for a in -7..7 {
-        for b in -7..7 {
-            objects.push(Box::new(random_sphere(a as f32, b as f32)));
-        }
-    }
-
-    let m = |mat: &str| match mat {
+    let mut m = |mat: &str| match mat {
         "gold" => Material::Metal { albedo: Vec3::new(0.8, 0.6, 0.2), fuzz: 0.0 },
         "marble" => Material::PolishedStone { albedo: Box::new(NoiseTexture::new(12.0, Vec3::new(0.6, 0.1, 0.2))) },
         "glass" => Material::Dielectric { ref_index: 1.5 },
+        "green_checker" => Material::TexturedLambertian { albedo: Box::new(CheckerTexture { check_size: 10.0, odd: Vec3::new(0.2, 0.3, 0.1), even: Vec3::splat(0.9) }) },
+        "rand_lambertian" => Material::Lambertian { albedo: Vec3::new(rand() * rand(), rand() * rand(), rand() * rand()) },
+        "rand_metal" => Material::Metal { albedo: Vec3::new(0.5 * (1.0 + rand()), 0.5 * (1.0 + rand()), 0.5 * (1.0 + rand())), fuzz: 0.5 * rand() },
         "glow_white" => Material::DiffuseLight { emission_colour: Vec3::new(2.0, 2.0, 2.0) },
-        _ => Material::TexturedLambertian { albedo: Box::new(CheckerTexture { check_size: 20.0, odd: Vec3::splat(0.0), even: Vec3::splat(1.0) }) }
+        _ => Material::Lambertian { albedo: Vec3::splat(1.0) }
     };
     for obj in &scene_spec.objects {
         objects.push(Box::new(Sphere { centre: obj.centre, radius: obj.radius, material: m(obj.material.as_ref()) }));
@@ -124,17 +138,9 @@ fn load_scene(aspect_ratio: f32, scene_spec: &SceneDeclaration) -> Scene {
     // let brushed_copper = Material::Metal { albedo: Vec3::new(0.7, 0.45, 0.2), fuzz: 0.3 };
     outlier_objects.push(Box::new(AARect { which: AARectWhich::XY, a_min: -4.0, a_max: 4.0, b_min: -4.0, b_max: 1.3, c: -1.7, negate_normal: false, material: brushed_gold}));
 
-    // The giant world sphere on which all others sit
-    let globe_texture = CheckerTexture {
-        check_size: 10.0,
-        odd: Vec3::new(0.2, 0.3, 0.1),
-        even: Vec3::new(0.9, 0.9, 0.9),
-    };
-    outlier_objects.push(Box::new(Sphere {
-        centre: world_centre,
-        radius: world_radius,
-        material: Material::TexturedLambertian { albedo: Box::new(globe_texture) },
-    }));
+    for obj in &scene_spec.outlier_objects {
+        outlier_objects.push(Box::new(Sphere { centre: obj.centre, radius: obj.radius, material: m(obj.material.as_ref()) }));
+    }
 
     // Configure the camera
     let camera_spec = &scene_spec.camera;
@@ -258,6 +264,9 @@ fn main() {
     let aspect_ratio: f32 = params.cols as f32 / params.rows as f32;
 
     println!("Welcome to JDs Rustaceous Raytracer!");
+
+    // Uncomment to output a file that writes out a randomised sphere grid
+    // gen_sphere_grid();
 
     // Set up variables for timing and progress printing
     let max_iterations = params.cols * params.rows;
