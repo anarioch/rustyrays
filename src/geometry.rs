@@ -367,7 +367,7 @@ impl<'a> BVH<'a> {
 
         // Check ray against each subtree
         let left_result = left.hit(&ray, t_min, t_max);
-        let right_result = right.hit(&ray, t_min, t_max);
+        let right_result = right.hit(&ray, t_min, match left_result { None => t_max, Some(ref r) => t_max.min(r.t) });
 
         // Tricky logic to return if either or both result is a miss
         let left_t = match left_result {
