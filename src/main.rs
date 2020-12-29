@@ -5,6 +5,7 @@ extern crate rand;
 extern crate serde;
 extern crate serde_json;
 
+use std::env;
 use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
@@ -120,6 +121,7 @@ fn load_scene(aspect_ratio: f32, scene_spec: &SceneDeclaration) -> Scene {
         "glass" => Material::Dielectric { ref_index: 1.5 },
         "green_checker" => Material::TexturedLambertian { albedo: Box::new(CheckerTexture { check_size: 10.0, odd: Vec3::new(0.2, 0.3, 0.1), even: Vec3::splat(0.9) }) },
         "rand_lambertian" => Material::Lambertian { albedo: Vec3::new(rand() * rand(), rand() * rand(), rand() * rand()) },
+        "white" => Material::Lambertian { albedo: Vec3::splat(1.0) },
         "rand_metal" => Material::Metal { albedo: Vec3::new(0.5 * (1.0 + rand()), 0.5 * (1.0 + rand()), 0.5 * (1.0 + rand())), fuzz: 0.5 * rand() },
         "glow_white" => Material::DiffuseLight { emission_colour: Vec3::new(2.0, 2.0, 2.0) },
         _ => Material::Lambertian { albedo: Vec3::splat(1.0) }
@@ -260,7 +262,9 @@ fn clamp(mut x: f32, min: f32, max: f32) -> f32 {
 }
 
 fn main() {
-    let params: TargetParameters = read_params_from_file("params.json").unwrap();
+    let args: Vec<String> = env::args().collect();
+    let scene_path = &args[1];
+    let params: TargetParameters = read_params_from_file(scene_path).unwrap();
     let aspect_ratio: f32 = params.cols as f32 / params.rows as f32;
 
     println!("Welcome to JDs Rustaceous Raytracer!");
