@@ -85,12 +85,12 @@ pub fn cast_ray(ray: &Ray, object: &BVH, depth: usize) -> (Vec3, usize) {
             }
         },
         None => {
-            // Vec3::new(0.0, 0.0, 0.0)
-            let unit = ray.direction.normalise();
-            let t = 0.5 * (unit.y + 1.0);
-            let blue = Vec3::new(0.25, 0.35, 0.5);
-            let white = Vec3::new(0.4, 0.4, 0.4);
-            (white*(1.0 - t) + blue*t, 1)
+            (Vec3::splat(0.0), 1)
+            // let unit = ray.direction.normalise();
+            // let t = 0.5 * (unit.y + 1.0);
+            // let blue = Vec3::new(0.25, 0.35, 0.5);
+            // let white = Vec3::new(0.4, 0.4, 0.4);
+            // (white*(1.0 - t) + blue*t, 1)
         }
     }
 }

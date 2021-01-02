@@ -1,0 +1,109 @@
+{
+    "cols": 800,
+    "rows": 800,
+    "samples_per_pixel": 1000,
+    "max_bounces": 30,
+    "scene": {
+        "objects": [
+            {
+                "shape": "sphere",
+                "centre": { "x": -1.0, "y": 0.7, "z": -2.0 },
+                "radius": 0.7,
+                "material": "white"
+            },
+            {
+                "shape": "sphere",
+                "centre": { "x": 0.0, "y": 0.4, "z": 0.0 },
+                "radius": 0.5,
+                "material": "white"
+            },
+            {
+                "shape": "sphere",
+                "centre": { "x": 1.0, "y": 0.7, "z": 2.0 },
+                "radius": 0.7,
+                "material": "white"
+            },
+            {
+                "shape": "sphere",
+                "centre": { "x": 0.0, "y": 3.5, "z": 0.0 },
+                "radius": 0.4,
+                "material": "glow_white"
+            }
+        ],
+        "outlier_objects": [
+            {
+                "shape": "aarect",
+                "which": "YZ",
+                "a_min": -4.0,
+                "a_max": 4.0,
+                "b_min": -4.0,
+                "b_max": 10.0,
+                "c": -2.0,
+                "negate_normal": false,
+                "material": "red"
+            },
+            {
+                "shape": "aarect",
+                "which": "YZ",
+                "a_min": -4.0,
+                "a_max": 4.0,
+                "b_min": -4.0,
+                "b_max": 10.0,
+                "c": 2.0,
+                "negate_normal": true,
+                "material": "green"
+            },
+            {
+                "shape": "aarect",
+                "which": "XY",
+                "a_min": -4.0,
+                "a_max": 4.0,
+                "b_min": -4.0,
+                "b_max": 4.0,
+                "c": -4.0,
+                "negate_normal": false,
+                "material": "white"
+            },
+            {
+                "shape": "aarect",
+                "which": "XY",
+                "a_min": -4.0,
+                "a_max": 4.0,
+                "b_min": -4.0,
+                "b_max": 4.0,
+                "c": 4.1,
+                "negate_normal": true,
+                "material": "white"
+            },
+            {
+                "shape": "aarect",
+                "which": "XZ",
+                "a_min": -4.0,
+                "a_max": 4.0,
+                "b_min": -4.0,
+                "b_max": 10.0,
+                "c": 4.0,
+                "negate_normal": false,
+                "material": "white"
+            },
+            {
+                "shape": "aarect",
+                "which": "XZ",
+                "a_min": -4.0,
+                "a_max": 4.0,
+                "b_min": -4.0,
+                "b_max": 10.0,
+                "c": 0.0,
+                "negate_normal": true,
+                "material": "white"
+            }
+        ],
+        "camera": {
+            "eye": { "x": 0.0, "y": 2.0, "z": 4.0 },
+            "focus": { "x": 0.0, "y": 2.0, "z": 0.0 },
+            "up": { "x": 0.0, "y": 1.0, "z": 0.0 },
+            "vertical_fov": 55.0,
+            "aperture": 0.03
+        }
+    }
+}
