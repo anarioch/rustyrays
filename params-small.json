@@ -1,0 +1,6 @@
+{
+    "cols": 800,
+    "rows": 800,
+    "samples_per_pixel": 100,
+    "max_bounces": 30
+}
