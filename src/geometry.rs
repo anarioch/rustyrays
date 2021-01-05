@@ -319,6 +319,10 @@ impl<'a> BVH<'a> {
     }
     // TODO: Return Result<BVH,String>
     pub fn build<'b>(objects: &'b mut [Box<dyn Hitable>]) -> BVH {
+        Self::build_internal(objects, 0)
+    }
+
+    fn build_internal<'b>(objects: &'b mut [Box<dyn Hitable>], depth: u32) -> BVH {
         // Base case of recursion
         let num_objects = objects.len();
         if num_objects == 1 {
@@ -326,20 +330,20 @@ impl<'a> BVH<'a> {
             let bounds = obj.bounds().expect("BVH can only hold objects with finite bounds");
             return BVH::Leaf { bounds, object: obj };
         }
-
-        // Choose a random axis, sort objects
+    
+        // Choose an axis, sort objects
         // Note that we assume objects to be mainly spread around the XZ plane
-        match rand::thread_rng().gen_range(0..2) {
+        match depth % 2 {
             0 => objects.sort_unstable_by(Self::compare_x_min),
             1 => objects.sort_unstable_by(Self::compare_z_min),
             // 2 => objects.sort_unstable_by(Self::compare_y_min),
-            _ => panic!("Unexpected random number encountered"),
+            _ => panic!("Unexpected axis number encountered"),
         };
-
+    
         // Partition the slice into two lists
         let (left,right) = objects.split_at_mut(num_objects / 2);
-        let left = Self::build(left);
-        let right = Self::build(right);
+        let left = Self::build_internal(left, depth + 1);
+        let right = Self::build_internal(right, depth + 1);
         let bounds = left.bounds().union(right.bounds());
         BVH::Node { bounds, left: Box::new(left), right: Box::new(right) }
     }
