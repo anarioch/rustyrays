@@ -15,7 +15,7 @@ pub fn new_dir(x: f32, y: f32, z: f32) -> Vec3 {
 }
 
 /// Axis Aligned Bounding Box
-#[derive(Debug)]
+#[derive(PartialEq, Debug)]
 pub struct AABB {
     pub min: Vec3,
     pub max: Vec3,
@@ -106,6 +106,12 @@ impl AABB {
     pub fn union_assign(&mut self, other: &Self) {
         self.min = self.min.min_vec(other.min);
         self.max = self.max.max_vec(other.max);
+    }
+
+    pub fn intersects(&self, other: &Self) -> bool {
+        (self.min.x <= other.max.x && self.max.x >= other.min.x) &&
+        (self.min.y <= other.max.y && self.max.y >= other.min.y) &&
+        (self.min.z <= other.max.z && self.max.z >= other.min.z)
     }
 }
 
@@ -338,11 +344,34 @@ impl<'a> BVH<'a> {
         BVH::Node { bounds, left: Box::new(left), right: Box::new(right) }
     }
 
-    pub fn glue(bvh: BVH<'a>, object: &'a Box<dyn Hitable>) -> BVH<'a> {
-        let left = BVH::Leaf { bounds: object.bounds().unwrap(), object };
-        let right = bvh;
+    fn new_node(left: BVH<'a>, right: BVH<'a>) -> BVH<'a> {
         let bounds = left.bounds().union(right.bounds());
         BVH::Node { bounds, left: Box::new(left), right: Box::new(right) }
+    }
+
+    pub fn insert(bvh: BVH<'a>, object: &'a Box<dyn Hitable>) -> BVH<'a> {
+        let new_leaf = BVH::Leaf { bounds: object.bounds().unwrap(), object };
+        Self::insert_leaf(bvh, new_leaf)
+    }
+
+    fn insert_leaf(bvh: BVH<'a>, leaf: BVH<'a>) -> BVH<'a> {
+        let new_bounds = leaf.bounds();
+
+        let (left, right) = match bvh {
+            BVH::Leaf{..} => return Self::new_node(leaf, bvh),
+            BVH::Node{left, right, ..} => (left, right),
+        };
+
+        let left_overlap = left.bounds().intersects(new_bounds);
+        let right_overlap = right.bounds().intersects(new_bounds);
+
+        let (left, right) = match (left_overlap, right_overlap) {
+            (true, false) => (Self::insert_leaf(*left, leaf), *right),
+            (false, true) => (*left, Self::insert_leaf(*right, leaf)),
+            (..) => (leaf, Self::new_node(*left, *right)),
+        };
+
+        Self::new_node(left, right)
     }
 
     fn bounds(&self) -> &AABB {
@@ -526,6 +555,20 @@ pub fn hit<'a>(ray: &Ray, t_min: f32, t_max: f32, objects: &'a [Box<dyn Hitable>
 mod tests {
     use super::super::materials::Invisible;
     use super::*;
+
+    #[test]
+    fn aabb_union() {
+        let a = AABB {min: Vec3::splat(0.0), max: Vec3::splat(1.0)};
+        let b = AABB {min: Vec3::splat(1.0), max: Vec3::splat(3.0)};
+        let c = AABB {min: Vec3::splat(2.0), max: Vec3::splat(3.0)};
+
+        assert_eq!(a, a);
+        assert_eq!(a, a.union(&a));
+        assert_eq!(AABB {min: Vec3::splat(0.0), max: Vec3::splat(3.0)}, a.union(&b));
+        assert_eq!(AABB {min: Vec3::splat(0.0), max: Vec3::splat(3.0)}, a.union(&c));
+
+        // TODO: Fix tests then run these tests to verify
+    }
 
     #[test]
     fn hit_sphere_works() {

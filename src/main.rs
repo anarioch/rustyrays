@@ -78,7 +78,7 @@ fn main() {
     let obj_slice = &mut scene.objects;
     let mut bvh = BVH::build(obj_slice);
     for ref outlier in &scene.outlier_objects {
-        bvh = BVH::glue(bvh, outlier);
+        bvh = BVH::insert(bvh, outlier);
     }
     let bvh = bvh;
 
