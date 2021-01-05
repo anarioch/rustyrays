@@ -66,12 +66,12 @@ fn main() {
 
     // Set up variables for timing and progress printing
     let max_iterations = params.cols * params.rows;
-    let mut num_iterations = 0;
+    let mut num_iterations: u64 = 0;
     let start_time = std::time::Instant::now();
     let mut last_time = std::time::Instant::now();
     let io_flush = || std::io::stdout().flush().expect("Could not flush stdout");
     io_flush();
-    let mut total_rays = 0;
+    let mut total_rays: u64 = 0;
 
     // Split outliers from rest of objects here to improve AABB sizes
     // TODO Figure out better heuristics to this automatically
@@ -100,7 +100,7 @@ fn main() {
                 let v = (pv + rng.gen::<f32>()) / params.rows as f32;
                 let ray = scene.camera.clip_to_ray(u, v);
                 let (ray_colour, ray_count) = raytrace::cast_ray(&ray, &bvh, params.max_bounces);
-                total_rays += ray_count;
+                total_rays += ray_count as u64;
 
                 // Add the colour to our accumulator
                 let mut colour = img[params.cols * r + c] + ray_colour;
