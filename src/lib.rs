@@ -19,7 +19,7 @@ use geometry::BVH;
 /// Cast a ray into the scene represented by the spatial lookup, returning a colour
 /// Depth should decrease by one for each bounced ray, terminating recursion onces it reaches zero
 /// Returns the colour and number of rays cast
-pub fn cast_ray(ray: &Ray, object: &BVH, depth: usize) -> (Vec3, usize) {
+pub fn cast_ray(ray: &Ray, object: &BVH, depth: u32) -> (Vec3, u32) {
     match object.hit(&ray, 0.001, 1000.0) {
         Some(record) => {
             // (normal.normalise() + Vec3::new(1.0, 1.0, 1.0)) * 0.5 // Use this return value to visualise normals
