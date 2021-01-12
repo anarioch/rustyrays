@@ -96,9 +96,7 @@ fn main() {
     let mut img : Vec<PixelCell> = Vec::with_capacity(params.cols * params.rows);
     img.resize(params.cols * params.rows, PixelCell { colour: Vec3::splat(0.0), num_rays: 0 });
     for s in 0..params.samples_per_pixel {
-        let mut image = PpmImage::create(params.cols, params.rows);
-        // let mut ray_view = PpmImage::create(params.cols, params.rows);
-        for r in (0..params.rows).rev() {
+        for r in 0..params.rows {
             let pv = r as f32;
             for c in 0..params.cols {
                 let pu = c as f32;
@@ -115,19 +113,6 @@ fn main() {
                 cell.num_rays += ray_count;
                 img[params.cols * r + c] = cell;
 
-                // Output the colour to current image
-                let mut colour = cell.colour;
-                colour *= 1.0 / (s + 1) as f32;
-                // Clamp the colour to [0..1]
-                let colour = colour.map(|x| clamp(x, 0.0, 1.0));
-                // Gamma correction: sqrt the colour
-                let colour = colour.map(|x| x.sqrt());
-                image.append_pixel(colour);
-
-                // Output the ray-count to its image
-                // let ray_count_colour = cell.num_rays as f32 / (10.0 * (s + 1) as f32);
-                // ray_view.append_pixel(Vec3::splat(clamp(ray_count_colour, 0.0, 1.0)));
-
                 num_iterations += 1;
             }
 
@@ -142,13 +127,36 @@ fn main() {
             }
         }
 
-        // Output the rendered scene image to a file
-        let path = Path::new("out/output.ppm");
-        write_text_to_file(&image.get_text(), &path, false);
+        // Render the scene and write to a file
+        {
+            let mut image = PpmImage::create(params.cols, params.rows);
+            // let mut ray_view = PpmImage::create(params.cols, params.rows);
+            for r in (0..params.rows).rev() {
+                for c in 0..params.cols {
+                    // Add the colour to our accumulator
+                    let cell = img[params.cols * r + c];
 
-        // Output the ray-count-per-pixel image to a file
-        // let rays_path = Path::new("out/ray_counts.ppm");
-        // write_text_to_file(&ray_view.get_text(), &rays_path, false);
+                    // Output the colour to current image
+                    let mut colour = cell.colour;
+                    colour *= 1.0 / (s + 1) as f32;
+                    // Clamp the colour to [0..1]
+                    let colour = colour.map(|x| clamp(x, 0.0, 1.0));
+                    // Gamma correction: sqrt the colour
+                    let colour = colour.map(|x| x.sqrt());
+                    image.append_pixel(colour);
+
+                    // Output the ray-count to its image
+                    // let ray_count_colour = cell.num_rays as f32 / (10.0 * (s + 1) as f32);
+                    // ray_view.append_pixel(Vec3::splat(clamp(ray_count_colour, 0.0, 1.0)));
+                }
+            }
+
+            let path = Path::new("out/output.ppm");
+            write_text_to_file(&image.get_text(), &path, false);
+
+            // let rays_path = Path::new("out/ray_counts.ppm");
+            // write_text_to_file(&ray_view.get_text(), &rays_path, false);
+        };
     }
 
     let time_elapsed = post_scene_gen_time.elapsed();
