@@ -93,9 +93,11 @@ fn main() {
 
     // Cast rays to generate the image
     let mut rng = rand::thread_rng();
-    let mut img : Vec<PixelCell> = Vec::with_capacity(params.cols * params.rows);
-    img.resize(params.cols * params.rows, PixelCell { colour: Vec3::splat(0.0), num_rays: 0 });
+    let mut accum : Vec<PixelCell> = Vec::with_capacity(params.cols * params.rows);
+    accum.resize(params.cols * params.rows, PixelCell { colour: Vec3::splat(0.0), num_rays: 0 });
     for s in 0..params.samples_per_pixel {
+        let mut img : Vec<PixelCell> = Vec::with_capacity(params.cols * params.rows);
+        img.resize(params.cols * params.rows, PixelCell { colour: Vec3::splat(0.0), num_rays: 0 });
         for r in 0..params.rows {
             let pv = r as f32;
             for c in 0..params.cols {
@@ -107,14 +109,11 @@ fn main() {
                 let (ray_colour, ray_count) = raytrace::cast_ray(&ray, &bvh, params.max_bounces);
                 total_rays += ray_count as u64;
 
-                // Add the colour to our accumulator
-                let mut cell = img[params.cols * r + c];
-                cell.colour += ray_colour;
-                cell.num_rays += ray_count;
-                img[params.cols * r + c] = cell;
-
-                num_iterations += 1;
+                // Store the colour
+                img[params.cols * r + c] = PixelCell { colour: ray_colour, num_rays: ray_count };
             }
+
+            num_iterations += params.cols as u64;
 
             if last_time.elapsed().as_secs() >= 1 {
                 let percentage_done = 100.0 * num_iterations as f32 / max_iterations as f32 / params.samples_per_pixel as f32;
@@ -127,6 +126,16 @@ fn main() {
             }
         }
 
+        // Accumulate this pass into the overall image
+        for r in (0..params.rows).rev() {
+            for c in 0..params.cols {
+                let src = &img[params.cols * r + c];
+                let target = &mut accum[params.cols * r + c];
+                target.colour += src.colour;
+                target.num_rays += src.num_rays;
+            }
+        }
+
         // Render the scene and write to a file
         {
             let mut image = PpmImage::create(params.cols, params.rows);
@@ -134,7 +143,7 @@ fn main() {
             for r in (0..params.rows).rev() {
                 for c in 0..params.cols {
                     // Add the colour to our accumulator
-                    let cell = img[params.cols * r + c];
+                    let cell = accum[params.cols * r + c];
 
                     // Output the colour to current image
                     let mut colour = cell.colour;
