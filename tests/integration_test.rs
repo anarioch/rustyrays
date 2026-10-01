@@ -1,6 +1,4 @@
-extern crate float_cmp;
 
-extern crate raytrace;
 
 use float_cmp::ApproxEqUlps;
 

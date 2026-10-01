@@ -159,7 +159,7 @@ fn sphere_ray_intersect(ray: &Ray, t_min: f32, t_max: f32, centre: Vec3, radius:
 }
 
 impl Hitable for Sphere {
-    fn hit(&self, ray: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {
+    fn hit(&self, ray: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord<'_>> {
         match sphere_ray_intersect(&ray, t_min, t_max, self.centre, self.radius) {
             Some(t) => {
                 let p = ray.at_t(t);
@@ -192,7 +192,7 @@ pub struct AARect {
 }
 
 impl Hitable for AARect {
-    fn hit(&self, ray: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {
+    fn hit(&self, ray: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord<'_>> {
         // Swizzle the inputs to match an XY plane layout
         let origin = ray.origin;
         let direction = ray.direction;
@@ -265,7 +265,7 @@ impl Clump {
 }
 
 impl Hitable for Clump {
-    fn hit<'a>(&'a self, ray: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {
+    fn hit<'a>(&'a self, ray: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord<'a>> {
         // Bounds check for the clump
         // Note the full t range; otherwise the segment is inside completely
         if let Some(ref b) = self.bounds {
@@ -318,11 +318,11 @@ impl<'a> BVH<'a> {
         a_val.partial_cmp(&b_val).unwrap()
     }
     // TODO: Return Result<BVH,String>
-    pub fn build<'b>(objects: &'b mut [Box<dyn Hitable>]) -> BVH {
+    pub fn build<'b>(objects: &'b mut [Box<dyn Hitable>]) -> BVH<'b> {
         Self::build_internal(objects, 0)
     }
 
-    fn build_internal<'b>(objects: &'b mut [Box<dyn Hitable>], depth: u32) -> BVH {
+    fn build_internal<'b>(objects: &'b mut [Box<dyn Hitable>], depth: u32) -> BVH<'b> {
         // Base case of recursion
         let num_objects = objects.len();
         if num_objects == 1 {
@@ -458,7 +458,7 @@ impl<'a> SIMDBVH<'a> {
         a_val.partial_cmp(&b_val).unwrap()
     }
     // TODO: Return Result<BVH,String>
-    pub fn build<'b>(objects: &'b mut [Box<dyn Hitable>]) -> SIMDBVH {
+    pub fn build<'b>(objects: &'b mut [Box<dyn Hitable>]) -> SIMDBVH<'b> {
         // Base case of recursion
         let num_objects = objects.len();
         if num_objects == 1 {

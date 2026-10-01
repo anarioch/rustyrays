@@ -1,9 +1,5 @@
 #![deny(bare_trait_objects)]
 
-extern crate rand;
-extern crate noise;
-extern crate serde;
-
 pub mod math;
 pub mod ppm;
 pub mod geometry;
@@ -12,8 +8,8 @@ pub mod materials;
 pub mod camera;
 pub mod scene;
 
-use math::*;
-use geometry::BVH;
+use crate::math::*;
+use crate::geometry::BVH;
 
 /// Cast a ray into the scene represented by the spatial lookup, returning a colour
 /// Depth should decrease by one for each bounced ray, terminating recursion onces it reaches zero

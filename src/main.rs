@@ -1,9 +1,5 @@
 #![deny(bare_trait_objects)]
 
-extern crate raytrace;
-extern crate rand;
-extern crate serde;
-extern crate serde_json;
 
 use std::env;
 use std::error::Error;

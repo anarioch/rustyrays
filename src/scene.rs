@@ -4,10 +4,10 @@ use std::io::prelude::*;
 use std::io::BufReader;
 use std::path::Path;
 
-use camera::*;
-use geometry::*;
-use materials::*;
-use math::*;
+use crate::camera::*;
+use crate::geometry::*;
+use crate::materials::*;
+use crate::math::*;
 
 use rand::Rng;
 use serde::{Deserialize, Serialize};

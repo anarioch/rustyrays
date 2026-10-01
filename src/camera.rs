@@ -1,4 +1,4 @@
-use math::*;
+use crate::math::*;
 
 /// A camera that can cast a ray into the scene
 pub struct Camera {
