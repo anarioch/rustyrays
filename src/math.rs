@@ -5,7 +5,7 @@ use rand::prelude::{ThreadRng,Rng};
 use serde::{Deserialize, Serialize};
 
 fn rand_f32(rng: &mut ThreadRng) -> f32 {
-    rng.r#gen::<f32>()
+    rng.random::<f32>()
 }
 
 #[derive(PartialEq, Debug, Clone, Copy, Deserialize, Serialize)]

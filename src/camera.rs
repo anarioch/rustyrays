@@ -43,7 +43,7 @@ impl Camera {
         if self.lens_radius > 0.0 {
             // Add noise to eye location to achieve depth-if-field
             // This chooses a random point on a disk sitting at the eye location, oriented to view direction
-            let rd = Vec3::random_in_unit_disk(&mut rand::thread_rng()) * self.lens_radius;
+            let rd = Vec3::random_in_unit_disk(&mut rand::rng()) * self.lens_radius;
             let offset = self.u * rd.x + self.v * rd.y;
             eye = self.eye + offset;
         }

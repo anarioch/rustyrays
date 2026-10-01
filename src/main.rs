@@ -85,7 +85,7 @@ fn main() {
     let post_scene_gen_time = std::time::Instant::now();
 
     // Cast rays to generate the image
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let mut accum : Vec<PixelCell> = Vec::with_capacity(params.cols * params.rows);
     accum.resize(params.cols * params.rows, PixelCell { colour: Vec3::splat(0.0), num_rays: 0 });
     for s in 0..params.samples_per_pixel {
@@ -96,8 +96,8 @@ fn main() {
             for c in 0..params.cols {
                 let pu = c as f32;
                 // Anti-aliased: average colour from multiple randomised samples per pixel
-                let u = (pu + rng.r#gen::<f32>()) / params.cols as f32;
-                let v = (pv + rng.r#gen::<f32>()) / params.rows as f32;
+                let u = (pu + rng.random::<f32>()) / params.cols as f32;
+                let v = (pv + rng.random::<f32>()) / params.rows as f32;
                 let ray = scene.camera.clip_to_ray(u, v);
                 let (ray_colour, ray_count) = raytrace::cast_ray(&ray, &bvh, params.max_bounces);
                 total_rays += ray_count as u64;

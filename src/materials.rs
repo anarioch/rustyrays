@@ -128,7 +128,7 @@ pub fn emit(material: &Material) -> Vec3 {
 }
 
 fn lambertian_scatter(albedo: Vec3, p: Vec3, normal: Vec3) -> Option<ScatterResult> {
-    let target = p + normal + Vec3::random_in_unit_sphere(&mut rand::thread_rng());
+    let target = p + normal + Vec3::random_in_unit_sphere(&mut rand::rng());
     let dir = target - p;
     let attenuation = albedo;
     let scattered = Ray { origin: p, direction: dir };
@@ -137,7 +137,7 @@ fn lambertian_scatter(albedo: Vec3, p: Vec3, normal: Vec3) -> Option<ScatterResu
 
 fn metal_scatter(albedo: Vec3, fuzz: f32, ray_dir: Vec3, p: Vec3, normal: Vec3) -> Option<ScatterResult> {
     let reflected = reflect(ray_dir.normalise(), normal);
-    let reflected = reflected + fuzz * Vec3::random_in_unit_sphere(&mut rand::thread_rng());
+    let reflected = reflected + fuzz * Vec3::random_in_unit_sphere(&mut rand::rng());
     if dot(reflected, normal) > 0.0 {
         let scattered = Ray { origin: p, direction: reflected };
         Some(ScatterResult { attenuation: albedo, scattered})
@@ -148,11 +148,11 @@ fn metal_scatter(albedo: Vec3, fuzz: f32, ray_dir: Vec3, p: Vec3, normal: Vec3) 
 }
 
 fn polished_stone_scatter(albedo: &dyn Texture, ray_dir: Vec3, p: Vec3, normal: Vec3) -> Option<ScatterResult> {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let reflected = reflect(ray_dir.normalise(), normal);
     let dotty = dot(reflected, normal);
     let reflect_prob = 1.0 - dotty.sqrt();
-    let (attenuation, direction) = if rng.r#gen::<f32>() < reflect_prob {
+    let (attenuation, direction) = if rng.random::<f32>() < reflect_prob {
         (Vec3::new(1.0, 1.0, 1.0), reflected)
     }
     else {
@@ -195,7 +195,7 @@ fn dielectric_scatter(ref_index: f32, ray_dir: Vec3, p: Vec3, normal: Vec3) -> O
             None => (Vec3::new(0.0, 0.0, 0.0), 1.0)
         };
     let ray_dir = 
-        if rand::thread_rng().r#gen::<f32>() < reflect_prob {
+        if rand::rng().random::<f32>() < reflect_prob {
             reflected
         }
         else {
