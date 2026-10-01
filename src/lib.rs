@@ -1,4 +1,3 @@
-#![deny(bare_trait_objects)]
 
 pub mod math;
 pub mod ppm;
