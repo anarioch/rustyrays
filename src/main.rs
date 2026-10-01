@@ -76,8 +76,8 @@ fn main() {
     // TODO Figure out better heuristics to this automatically
     let obj_slice = &mut scene.objects;
     let mut bvh = BVH::build(obj_slice);
-    for ref outlier in &scene.outlier_objects {
-        bvh = BVH::insert(bvh, outlier);
+    for outlier in &scene.outlier_objects {
+        bvh = BVH::insert(bvh, &**outlier);
     }
     let bvh = bvh;
 
@@ -146,7 +146,7 @@ fn main() {
     println!("Writing file..");
 }
 
-fn emit_image(accum: &Vec<PixelCell>, rows: usize, cols: usize, num_samples: usize) {
+fn emit_image(accum: &[PixelCell], rows: usize, cols: usize, num_samples: usize) {
     let mut image = PpmImage::create(cols, rows);
     // let mut ray_view = PpmImage::create(cols, rows);
     for r in (0..rows).rev() {
@@ -170,7 +170,7 @@ fn emit_image(accum: &Vec<PixelCell>, rows: usize, cols: usize, num_samples: usi
     }
 
     let path = Path::new("out/output.ppm");
-    write_text_to_file(&image.get_text(), &path, false);
+    write_text_to_file(&image.get_text(), path, false);
 
     // let rays_path = Path::new("out/ray_counts.ppm");
     // write_text_to_file(&ray_view.get_text(), &rays_path, false);
@@ -179,7 +179,7 @@ fn emit_image(accum: &Vec<PixelCell>, rows: usize, cols: usize, num_samples: usi
 fn write_text_to_file(text: &str, path: &Path, write_status: bool) {
     let display = path.display();
 
-    let mut file = match File::create(&path) {
+    let mut file = match File::create(path) {
         Err(why) => panic!("Failed to create file {}: {}", display, why),
         Ok(file) => file,
     };

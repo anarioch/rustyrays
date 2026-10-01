@@ -112,7 +112,7 @@ pub fn gen_sphere_grid() {
 
     let ss = serde_json::to_string(&dec).unwrap();
     let path = Path::new("sphere_grid.json");
-    write_text_to_file(&ss, &path);
+    write_text_to_file(&ss, path);
 }
 
 pub fn load_scene<P: AsRef<Path>>(aspect_ratio: f32, scene_path: P) -> Scene {
@@ -174,7 +174,7 @@ pub fn load_scene<P: AsRef<Path>>(aspect_ratio: f32, scene_path: P) -> Scene {
 fn write_text_to_file(text: &str, path: &Path) {
     let display = path.display();
 
-    let mut file = match File::create(&path) {
+    let mut file = match File::create(path) {
         Err(why) => panic!("Failed to create file {}: {}", display, why),
         Ok(file) => file,
     };

@@ -159,7 +159,7 @@ fn sphere_ray_intersect(ray: &Ray, t_min: f32, t_max: f32, centre: Vec3, radius:
 
 impl Hitable for Sphere {
     fn hit(&self, ray: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord<'_>> {
-        match sphere_ray_intersect(&ray, t_min, t_max, self.centre, self.radius) {
+        match sphere_ray_intersect(ray, t_min, t_max, self.centre, self.radius) {
             Some(t) => {
                 let p = ray.at_t(t);
                 let normal = (p - self.centre) * (1.0/self.radius);
@@ -242,21 +242,11 @@ impl Clump {
     fn compute_bounds( objects: &[Sphere]) -> Option<AABB> {
         let mut iter = objects.iter();
 
-        let first = match iter.next() {
-            None => return None,
-            Some(obj) => obj,
-        };
-        let mut bounds = match first.bounds() {
-            None => return None,
-            Some(aabb) => aabb,
-        };
+        let first = iter.next()?;
+        let mut bounds = first.bounds()?;
 
         for obj in iter {
-            match obj.bounds() {
-                None => return None,
-                Some(aabb) => bounds.union_assign(&aabb),
-            };
-            
+            bounds.union_assign(&obj.bounds()?);
         }
 
         Some(bounds)
@@ -267,17 +257,16 @@ impl Hitable for Clump {
     fn hit<'a>(&'a self, ray: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord<'a>> {
         // Bounds check for the clump
         // Note the full t range; otherwise the segment is inside completely
-        if let Some(ref b) = self.bounds {
-            if !b.hit(&ray, t_min, t_max) {
-                return None;
-            }
+        if let Some(b) = &self.bounds
+            && !b.hit(ray, t_min, t_max) {
+            return None;
         }
 
         // Check each contained object
         let mut result = None;
         let mut closest_so_far = t_max;
         for obj in &self.objects {
-            if let Some(record) = obj.hit(&ray, t_min, closest_so_far) {
+            if let Some(record) = obj.hit(ray, t_min, closest_so_far) {
                 closest_so_far = record.t;
                 result = Some(record);
             };
@@ -286,10 +275,7 @@ impl Hitable for Clump {
         result
     }
     fn bounds(&self) -> Option<AABB> {
-        match self.bounds {
-            None => None,
-            Some(ref b) => Some(AABB { min: b.min, max: b.max }),
-        }
+        self.bounds.as_ref().map(|b| AABB { min: b.min, max: b.max })
     }
 }
 
@@ -297,21 +283,21 @@ impl Hitable for Clump {
 /// This is a binary tree that ultimately contains a Hitable
 pub enum BVH<'a> {
     Node { bounds: AABB, left: Box<BVH<'a>>, right: Box<BVH<'a>> },
-    Leaf { bounds: AABB, object: &'a Box<dyn Hitable> },
+    Leaf { bounds: AABB, object: &'a dyn Hitable },
 }
 
 impl<'a> BVH<'a> {
-    fn compare_x_min(a: &Box<dyn Hitable>, b: &Box<dyn Hitable>) -> Ordering {
+    fn compare_x_min(a: &dyn Hitable, b: &dyn Hitable) -> Ordering {
         let a_val: f32 = a.bounds().unwrap().min.x;
         let b_val: f32 = b.bounds().unwrap().min.x;
         a_val.partial_cmp(&b_val).unwrap()
     }
-    fn _compare_y_min(a: &Box<dyn Hitable>, b: &Box<dyn Hitable>) -> Ordering {
+    fn _compare_y_min(a: &dyn Hitable, b: &dyn Hitable) -> Ordering {
         let a_val: f32 = a.bounds().unwrap().min.y;
         let b_val: f32 = b.bounds().unwrap().min.y;
         a_val.partial_cmp(&b_val).unwrap()
     }
-    fn compare_z_min(a: &Box<dyn Hitable>, b: &Box<dyn Hitable>) -> Ordering {
+    fn compare_z_min(a: &dyn Hitable, b: &dyn Hitable) -> Ordering {
         let a_val: f32 = a.bounds().unwrap().min.z;
         let b_val: f32 = b.bounds().unwrap().min.z;
         a_val.partial_cmp(&b_val).unwrap()
@@ -327,15 +313,15 @@ impl<'a> BVH<'a> {
         if num_objects == 1 {
             let obj = &objects[0];
             let bounds = obj.bounds().expect("BVH can only hold objects with finite bounds");
-            return BVH::Leaf { bounds, object: obj };
+            return BVH::Leaf { bounds, object: &**obj };
         }
     
         // Choose an axis, sort objects
         // Note that we assume objects to be mainly spread around the XZ plane
         match depth % 2 {
-            0 => objects.sort_unstable_by(Self::compare_x_min),
-            1 => objects.sort_unstable_by(Self::compare_z_min),
-            // 2 => objects.sort_unstable_by(Self::compare_y_min),
+            0 => objects.sort_unstable_by(|a, b| Self::compare_x_min(&**a, &**b)),
+            1 => objects.sort_unstable_by(|a, b| Self::compare_z_min(&**a, &**b)),
+            // 2 => objects.sort_unstable_by(|a, b| Self::compare_y_min(&**a, &**b)),
             _ => panic!("Unexpected axis number encountered"),
         };
     
@@ -352,7 +338,7 @@ impl<'a> BVH<'a> {
         BVH::Node { bounds, left: Box::new(left), right: Box::new(right) }
     }
 
-    pub fn insert(bvh: BVH<'a>, object: &'a Box<dyn Hitable>) -> BVH<'a> {
+    pub fn insert(bvh: BVH<'a>, object: &'a dyn Hitable) -> BVH<'a> {
         let new_leaf = BVH::Leaf { bounds: object.bounds().unwrap(), object };
         Self::insert_leaf(bvh, new_leaf)
     }
@@ -387,19 +373,19 @@ impl<'a> BVH<'a> {
     pub fn hit(&'a self, ray: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord<'a>> {
         // Bounds check for the clump
         // Note the full t range; otherwise the segment is inside completely
-        if !self.bounds().hit(&ray, t_min, t_max) {
+        if !self.bounds().hit(ray, t_min, t_max) {
             return None;
         };
 
         // Thunk to contained object for leaf, and extract subtrees for nodes
         let (left, right) = match self {
-            BVH::Leaf{object, ..} => return object.hit(&ray, t_min, t_max),
+            BVH::Leaf{object, ..} => return object.hit(ray, t_min, t_max),
             BVH::Node{left, right, ..} => (left, right),
         };
 
         // Check ray against each subtree
-        let left_result = left.hit(&ray, t_min, t_max);
-        let right_result = right.hit(&ray, t_min, match left_result { None => t_max, Some(ref r) => t_max.min(r.t) });
+        let left_result = left.hit(ray, t_min, t_max);
+        let right_result = right.hit(ray, t_min, match left_result { None => t_max, Some(ref r) => t_max.min(r.t) });
 
         // Tricky logic to return if either or both result is a miss
         let left_t = match left_result {
@@ -437,21 +423,21 @@ fn from_simd_ray(ray: &simd::Ray) -> Ray {
 /// This is a binary tree that ultimately contains a Hitable
 pub enum SIMDBVH<'a> {
     Node { bounds: simd::AABB, left: Box<SIMDBVH<'a>>, right: Box<SIMDBVH<'a>> },
-    Leaf { bounds: simd::AABB, object: &'a Box<dyn Hitable> },
+    Leaf { bounds: simd::AABB, object: &'a dyn Hitable },
 }
 
 impl<'a> SIMDBVH<'a> {
-    fn compare_x_min(a: &Box<dyn Hitable>, b: &Box<dyn Hitable>) -> Ordering {
+    fn compare_x_min(a: &dyn Hitable, b: &dyn Hitable) -> Ordering {
         let a_val: f32 = a.bounds().unwrap().min.x;
         let b_val: f32 = b.bounds().unwrap().min.x;
         a_val.partial_cmp(&b_val).unwrap()
     }
-    fn _compare_y_min(a: &Box<dyn Hitable>, b: &Box<dyn Hitable>) -> Ordering {
+    fn _compare_y_min(a: &dyn Hitable, b: &dyn Hitable) -> Ordering {
         let a_val: f32 = a.bounds().unwrap().min.y;
         let b_val: f32 = b.bounds().unwrap().min.y;
         a_val.partial_cmp(&b_val).unwrap()
     }
-    fn compare_z_min(a: &Box<dyn Hitable>, b: &Box<dyn Hitable>) -> Ordering {
+    fn compare_z_min(a: &dyn Hitable, b: &dyn Hitable) -> Ordering {
         let a_val: f32 = a.bounds().unwrap().min.z;
         let b_val: f32 = b.bounds().unwrap().min.z;
         a_val.partial_cmp(&b_val).unwrap()
@@ -463,15 +449,15 @@ impl<'a> SIMDBVH<'a> {
         if num_objects == 1 {
             let obj = &objects[0];
             let bounds = to_simd_bounds(&obj.bounds().expect("BVH can only hold objects with finite bounds"));
-            return SIMDBVH::Leaf { bounds, object: obj };
+            return SIMDBVH::Leaf { bounds, object: &**obj };
         }
 
         // Choose a random axis, sort objects
         // Note that we assume objects to be mainly spread around the XZ plane
         match rand::rng().random_range(0..2) {
-            0 => objects.sort_unstable_by(Self::compare_x_min),
-            1 => objects.sort_unstable_by(Self::compare_z_min),
-            // 2 => objects.sort_unstable_by(Self::compare_y_min),
+            0 => objects.sort_unstable_by(|a, b| Self::compare_x_min(&**a, &**b)),
+            1 => objects.sort_unstable_by(|a, b| Self::compare_z_min(&**a, &**b)),
+            // 2 => objects.sort_unstable_by(|a, b| Self::compare_y_min(&**a, &**b)),
             _ => panic!("Unexpected random number encountered"),
         };
 
@@ -483,7 +469,7 @@ impl<'a> SIMDBVH<'a> {
         SIMDBVH::Node { bounds, left: Box::new(left), right: Box::new(right) }
     }
 
-    pub fn glue(bvh: SIMDBVH<'a>, object: &'a Box<dyn Hitable>) -> SIMDBVH<'a> {
+    pub fn glue(bvh: SIMDBVH<'a>, object: &'a dyn Hitable) -> SIMDBVH<'a> {
         let left = SIMDBVH::Leaf { bounds: to_simd_bounds(&object.bounds().unwrap()), object };
         let right = bvh;
         let bounds = left.bounds().union(right.bounds());
@@ -500,19 +486,19 @@ impl<'a> SIMDBVH<'a> {
     pub fn hit(&'a self, ray: &simd::Ray, t_min: f32, t_max: f32) -> Option<HitRecord<'a>> {
         // Bounds check for the clump
         // Note the full t range; otherwise the segment is inside completely
-        if !self.bounds().hit(&ray, t_min, t_max) {
+        if !self.bounds().hit(ray, t_min, t_max) {
             return None;
         };
 
         // Thunk to contained object for leaf, and extract subtrees for nodes
         let (left, right) = match self {
-            SIMDBVH::Leaf{object, ..} => return object.hit(&from_simd_ray(&ray), t_min, t_max),
+            SIMDBVH::Leaf{object, ..} => return object.hit(&from_simd_ray(ray), t_min, t_max),
             SIMDBVH::Node{left, right, ..} => (left, right),
         };
 
         // Check ray against each subtree
-        let left_result = left.hit(&ray, t_min, t_max);
-        let right_result = right.hit(&ray, t_min, t_max);
+        let left_result = left.hit(ray, t_min, t_max);
+        let right_result = right.hit(ray, t_min, t_max);
 
         // Tricky logic to return if either or both result is a miss
         let left_t = match left_result {
@@ -545,7 +531,7 @@ pub fn hit<'a>(ray: &Ray, t_min: f32, t_max: f32, objects: &'a [Box<dyn Hitable>
     let mut result = None;
     let mut closest_so_far = t_max;
     for obj in objects {
-        if let Some(record) = (*obj).hit(&ray, t_min, closest_so_far) {
+        if let Some(record) = (*obj).hit(ray, t_min, closest_so_far) {
             closest_so_far = record.t;
             result = Some(record);
         }
@@ -601,15 +587,15 @@ mod tests {
         let y_axis = new_dir(0.0, 1.0, 0.0);
 
         // Temp test: construct the ray separately to allow debugging
-        let ray = Ray { origin: origin, direction: -y_axis };
-        assert_eq!(aabb.hit(&ray, 0.0, 1000.0), true);
+        let ray = Ray { origin, direction: -y_axis };
+        assert!(aabb.hit(&ray, 0.0, 1000.0));
 
         // When: we check for a hit then each ray raturns appropriately
-        assert_eq!(aabb.hit(&Ray { origin: origin,  direction: -y_axis }, 0.0, 1000.0), true);  // ray pointing into box
-        assert_eq!(aabb.hit(&Ray { origin: origin,  direction: -y_axis }, 0.0,    1.0), false); // ray pointing into box but t range too short
-        assert_eq!(aabb.hit(&Ray { origin: origin,  direction:  y_axis }, 0.0, 1000.0), false); // ray pointing away from box
-        assert_eq!(aabb.hit(&Ray { origin: along_x, direction: -y_axis }, 0.0, 1000.0), false); // ray parallel to y axis and along x
-        assert_eq!(aabb.hit(&Ray { origin: along_x, direction:  y_axis }, 0.0, 1000.0), false); // ray parallel to y axis and along x, pointing away
+        assert!(aabb.hit(&Ray { origin,  direction: -y_axis }, 0.0, 1000.0));  // ray pointing into box
+        assert!(!aabb.hit(&Ray { origin,  direction: -y_axis }, 0.0,    1.0)); // ray pointing into box but t range too short
+        assert!(!aabb.hit(&Ray { origin,  direction:  y_axis }, 0.0, 1000.0)); // ray pointing away from box
+        assert!(!aabb.hit(&Ray { origin: along_x, direction: -y_axis }, 0.0, 1000.0)); // ray parallel to y axis and along x
+        assert!(!aabb.hit(&Ray { origin: along_x, direction:  y_axis }, 0.0, 1000.0)); // ray parallel to y axis and along x, pointing away
     }
 
 }

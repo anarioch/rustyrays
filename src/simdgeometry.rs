@@ -397,14 +397,14 @@ mod tests {
         let ny_axis = new_dir(0.0, -1.0, 0.0);
 
         // Temp test: construct the ray separately to allow debugging
-        let ray = Ray { origin: origin, direction: ny_axis };
-        assert_eq!(aabb.hit(&ray, 0.0, 1000.0), true);
+        let ray = Ray { origin, direction: ny_axis };
+        assert!(aabb.hit(&ray, 0.0, 1000.0));
 
         // When: we check for a hit then each ray raturns appropriately
-        assert_eq!(aabb.hit(&Ray { origin: origin,  direction: ny_axis }, 0.0, 1000.0), true);  // ray pointing into box
-        assert_eq!(aabb.hit(&Ray { origin: origin,  direction: ny_axis }, 0.0,    1.0), false); // ray pointing into box but t range too short
-        assert_eq!(aabb.hit(&Ray { origin: origin,  direction:  y_axis }, 0.0, 1000.0), false); // ray pointing away from box
-        assert_eq!(aabb.hit(&Ray { origin: along_x, direction: ny_axis }, 0.0, 1000.0), false); // ray parallel to y axis and along x
-        assert_eq!(aabb.hit(&Ray { origin: along_x, direction:  y_axis }, 0.0, 1000.0), false); // ray parallel to y axis and along x, pointing away
+        assert!(aabb.hit(&Ray { origin,  direction: ny_axis }, 0.0, 1000.0));  // ray pointing into box
+        assert!(!aabb.hit(&Ray { origin,  direction: ny_axis }, 0.0,    1.0)); // ray pointing into box but t range too short
+        assert!(!aabb.hit(&Ray { origin,  direction:  y_axis }, 0.0, 1000.0)); // ray pointing away from box
+        assert!(!aabb.hit(&Ray { origin: along_x, direction: ny_axis }, 0.0, 1000.0)); // ray parallel to y axis and along x
+        assert!(!aabb.hit(&Ray { origin: along_x, direction:  y_axis }, 0.0, 1000.0)); // ray parallel to y axis and along x, pointing away
     }
 }

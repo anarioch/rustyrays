@@ -37,7 +37,7 @@ impl Camera {
 
     /// Cast a ray into the scene from the given position in clip space
     pub fn clip_to_ray(&self, u: f32, v: f32) -> Ray {
-        assert!(u >= 0.0 && u <= 1.0 && v >= 0.0 && v <= 1.0, "Invalid clip space coordinates.  Expected values in [0,1]; found: [{},{}]", u, v);
+        assert!((0.0..=1.0).contains(&u) && (0.0..=1.0).contains(&v), "Invalid clip space coordinates.  Expected values in [0,1]; found: [{},{}]", u, v);
 
         let mut eye = self.eye;
         if self.lens_radius > 0.0 {
