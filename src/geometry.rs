@@ -122,7 +122,8 @@ pub struct HitRecord<'a> {
     pub material: &'a Material,
 }
 
-pub trait Hitable {
+/// Send + Sync so scenes can be shared across render threads
+pub trait Hitable: Send + Sync {
     fn hit<'a>(&'a self, ray: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord<'a>>;
     fn bounds(&self) -> Option<AABB>;
 }
@@ -576,6 +577,13 @@ mod tests {
             None => (),
             Some(_) => panic!("This ray and sphere were supposed to miss"),
         };
+    }
+
+    #[test]
+    fn bvh_is_thread_safe() {
+        // Compile-time check: fails to build if anything reachable from a BVH isn't Sync
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<BVH>();
     }
 
     #[test]

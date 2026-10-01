@@ -7,7 +7,8 @@ use rand::Rng;
 use super::math::*;
 use super::geometry::HitRecord;
 
-pub trait Texture {
+/// Send + Sync so scenes can be shared across render threads
+pub trait Texture: Send + Sync {
     fn value(&self, u: f32, v: f32, p: Vec3) -> Vec3;
 }
 
