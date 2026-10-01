@@ -20,3 +20,28 @@ float-cmp = "0.10"
 
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+
+# Keep lib/bin out of `cargo bench` so criterion CLI args aren't passed to libtest
+[lib]
+bench = false
+
+[[bin]]
+name = "raytrace"
+path = "src/main.rs"
+bench = false
+
+[dev-dependencies]
+criterion = "0.8"
+
+# harness = false: criterion supplies main() instead of the built-in libtest harness
+[[bench]]
+name = "bench_geometry"
+harness = false
+
+[[bench]]
+name = "bench_materials"
+harness = false
+
+[[bench]]
+name = "bench_simdgeometry"
+harness = false

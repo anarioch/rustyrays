@@ -1,14 +1,10 @@
-// Needed for using 'cargo bench', though I don't fully follow why
-#![feature(test)]
-extern crate test;
-
-extern crate raytrace;
 
 use raytrace::simdgeometry::*;
 
-use test::{Bencher,black_box};
+use std::hint::black_box;
 
-#[bench]
+use criterion::{Bencher, Criterion, criterion_group, criterion_main};
+
 fn simdbench_ray_aabb_hit(b: &mut Bencher) {
     // Optionally include some setup
     let aabb = AABB { min: new_pos( -2.0, -2.0, -2.0), max: new_pos(2.0, -1.5, 2.0) };
@@ -21,7 +17,6 @@ fn simdbench_ray_aabb_hit(b: &mut Bencher) {
     });
 }
 
-#[bench]
 fn simdbench_ray_aabb_miss(b: &mut Bencher) {
     // Optionally include some setup
     let aabb = AABB { min: new_pos( -2.0, -2.0, -2.0), max: new_pos(2.0, -1.5, 2.0) };
@@ -34,7 +29,6 @@ fn simdbench_ray_aabb_miss(b: &mut Bencher) {
     });
 }
 
-#[bench]
 fn simdbench_ray_aabb_miss_by_t(b: &mut Bencher) {
     // Optionally include some setup
     let aabb = AABB { min: new_pos( -2.0, -2.0, -2.0), max: new_pos(2.0, -1.5, 2.0) };
@@ -68,7 +62,6 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-#[bench]
 fn simdbench_ray_spherescene_aabbarray_hit(b: &mut Bencher) {
     // Given: a grid of objects
     let aabbs = aabb_scene();
@@ -107,8 +100,8 @@ fn simdbench_ray_spherescene_aabbarray_hit(b: &mut Bencher) {
     });
 }
 
-fn grid_scene() -> Vec<Box<raytrace::geometry::Hitable>> {
-    let mut objects : Vec<Box<raytrace::geometry::Hitable>> = Vec::new();
+fn grid_scene() -> Vec<Box<dyn raytrace::geometry::Hitable>> {
+    let mut objects : Vec<Box<dyn raytrace::geometry::Hitable>> = Vec::new();
 
     for a in -7..7 {
         for b in -7..7 {
@@ -120,7 +113,6 @@ fn grid_scene() -> Vec<Box<raytrace::geometry::Hitable>> {
     objects
 }
 
-#[bench]
 fn simdbench_ray_spherescene_bvh_hit(b: &mut Bencher) {
     // Given: a grid of objects
     let mut scene = grid_scene();
@@ -135,7 +127,6 @@ fn simdbench_ray_spherescene_bvh_hit(b: &mut Bencher) {
     });
 }
 
-#[bench]
 fn simdbench_ray_spherescene_bvh_hit2(b: &mut Bencher) {
     // Given: a grid of objects
     let mut scene = grid_scene();
@@ -150,7 +141,6 @@ fn simdbench_ray_spherescene_bvh_hit2(b: &mut Bencher) {
     });
 }
 
-#[bench]
 fn simdbench_ray_spherescene_bvh_miss(b: &mut Bencher) {
     // Given: a grid of objects
     let mut scene = grid_scene();
@@ -165,3 +155,16 @@ fn simdbench_ray_spherescene_bvh_miss(b: &mut Bencher) {
     });
 }
 
+
+fn benches(c: &mut Criterion) {
+    c.bench_function("simd_ray_aabb_hit", simdbench_ray_aabb_hit);
+    c.bench_function("simd_ray_aabb_miss", simdbench_ray_aabb_miss);
+    c.bench_function("simd_ray_aabb_miss_by_t", simdbench_ray_aabb_miss_by_t);
+    c.bench_function("simd_ray_spherescene_aabbarray_hit", simdbench_ray_spherescene_aabbarray_hit);
+    c.bench_function("simd_ray_spherescene_bvh_hit", simdbench_ray_spherescene_bvh_hit);
+    c.bench_function("simd_ray_spherescene_bvh_hit2", simdbench_ray_spherescene_bvh_hit2);
+    c.bench_function("simd_ray_spherescene_bvh_miss", simdbench_ray_spherescene_bvh_miss);
+}
+
+criterion_group!(group, benches);
+criterion_main!(group);
