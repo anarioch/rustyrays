@@ -395,7 +395,7 @@ impl<'a> BVH<'a> {
         // Thunk to contained object for leaf, and extract subtrees for nodes
         let (left, right) = match self {
             BVH::Leaf{object, ..} => return object.hit(&ray, t_min, t_max),
-            BVH::Node{ref left, ref right, ..} => (left, right),
+            BVH::Node{left, right, ..} => (left, right),
         };
 
         // Check ray against each subtree
@@ -508,7 +508,7 @@ impl<'a> SIMDBVH<'a> {
         // Thunk to contained object for leaf, and extract subtrees for nodes
         let (left, right) = match self {
             SIMDBVH::Leaf{object, ..} => return object.hit(&from_simd_ray(&ray), t_min, t_max),
-            SIMDBVH::Node{ref left, ref right, ..} => (left, right),
+            SIMDBVH::Node{left, right, ..} => (left, right),
         };
 
         // Check ray against each subtree

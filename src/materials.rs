@@ -122,7 +122,7 @@ pub fn scatter(ray: &Ray, hit: &HitRecord) -> Option<ScatterResult> {
 
 pub fn emit(material: &Material) -> Vec3 {
     match material {
-        Material::DiffuseLight { ref emission_colour } => *emission_colour,
+        Material::DiffuseLight { emission_colour } => *emission_colour,
         _ => Vec3::new(0.0, 0.0, 0.0)
     }
 }
@@ -152,7 +152,7 @@ fn polished_stone_scatter(albedo: &dyn Texture, ray_dir: Vec3, p: Vec3, normal: 
     let reflected = reflect(ray_dir.normalise(), normal);
     let dotty = dot(reflected, normal);
     let reflect_prob = 1.0 - dotty.sqrt();
-    let (attenuation, direction) = if rng.gen::<f32>() < reflect_prob {
+    let (attenuation, direction) = if rng.r#gen::<f32>() < reflect_prob {
         (Vec3::new(1.0, 1.0, 1.0), reflected)
     }
     else {
@@ -195,7 +195,7 @@ fn dielectric_scatter(ref_index: f32, ray_dir: Vec3, p: Vec3, normal: Vec3) -> O
             None => (Vec3::new(0.0, 0.0, 0.0), 1.0)
         };
     let ray_dir = 
-        if rand::thread_rng().gen::<f32>() < reflect_prob {
+        if rand::thread_rng().r#gen::<f32>() < reflect_prob {
             reflected
         }
         else {

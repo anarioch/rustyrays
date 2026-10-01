@@ -84,7 +84,7 @@ fn read_spec_from_file<P: AsRef<Path>>(path: P) -> Result<SceneDeclaration, Box<
 
 pub fn gen_sphere_grid() {
     let mut rng = rand::thread_rng();
-    let mut rand = || rng.gen::<f32>();
+    let mut rand = || rng.r#gen::<f32>();
 
     let world_radius = 1000.0;
 
@@ -121,7 +121,7 @@ pub fn load_scene<P: AsRef<Path>>(aspect_ratio: f32, scene_path: P) -> Scene {
     let mut objects : Vec<Box<dyn Hitable>> = Vec::new();
     let mut outlier_objects : Vec<Box<dyn Hitable>> = Vec::new();
     let mut rng = rand::thread_rng();
-    let mut rand = || rng.gen::<f32>();
+    let mut rand = || rng.r#gen::<f32>();
 
     let mut m = |mat: &str| match mat {
         "gold" => Material::Metal { albedo: Vec3::new(0.8, 0.6, 0.2), fuzz: 0.0 },

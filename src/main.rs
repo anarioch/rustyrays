@@ -1,5 +1,3 @@
-
-
 use std::env;
 use std::error::Error;
 use std::fs::File;
@@ -98,8 +96,8 @@ fn main() {
             for c in 0..params.cols {
                 let pu = c as f32;
                 // Anti-aliased: average colour from multiple randomised samples per pixel
-                let u = (pu + rng.gen::<f32>()) / params.cols as f32;
-                let v = (pv + rng.gen::<f32>()) / params.rows as f32;
+                let u = (pu + rng.r#gen::<f32>()) / params.cols as f32;
+                let v = (pv + rng.r#gen::<f32>()) / params.rows as f32;
                 let ray = scene.camera.clip_to_ray(u, v);
                 let (ray_colour, ray_count) = raytrace::cast_ray(&ray, &bvh, params.max_bounces);
                 total_rays += ray_count as u64;

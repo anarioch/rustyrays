@@ -165,24 +165,28 @@ pub struct AABB {
 
 /// Horizontal min of a 3-component vector
 unsafe fn _hmin_ps(v: __m128) -> f32 {
-    // Shuffle y and z values into x component of tmp vectors
-    let y = _mm_shuffle_ps(v, v, _mm_shuffle!(0,0,0,1));
-    let z = _mm_shuffle_ps(v, v, _mm_shuffle!(0,0,0,2));
-    // Then do two mins to compare x / y / z
-    let min1 = _mm_min_ps(v, y);
-    let min2 = _mm_min_ps(min1, z);
-    _mm_cvtss_f32(min2)
+    unsafe {
+        // Shuffle y and z values into x component of tmp vectors
+        let y = _mm_shuffle_ps(v, v, _mm_shuffle!(0,0,0,1));
+        let z = _mm_shuffle_ps(v, v, _mm_shuffle!(0,0,0,2));
+        // Then do two mins to compare x / y / z
+        let min1 = _mm_min_ps(v, y);
+        let min2 = _mm_min_ps(min1, z);
+        _mm_cvtss_f32(min2)
+    }
 }
 
 /// Horizontal min of a 3-component vector
 unsafe fn _hmax_ps(v: __m128) -> f32 {
-    // Shuffle y and z values into x component of tmp vectors
-    let y = _mm_shuffle_ps(v, v, _mm_shuffle!(0,0,0,1));
-    let z = _mm_shuffle_ps(v, v, _mm_shuffle!(0,0,0,2));
-    // Then do two mins to compare x / y / z
-    let max1 = _mm_max_ps(v, y);
-    let max2 = _mm_max_ps(max1, z);
-    _mm_cvtss_f32(max2)
+    unsafe {
+        // Shuffle y and z values into x component of tmp vectors
+        let y = _mm_shuffle_ps(v, v, _mm_shuffle!(0,0,0,1));
+        let z = _mm_shuffle_ps(v, v, _mm_shuffle!(0,0,0,2));
+        // Then do two mins to compare x / y / z
+        let max1 = _mm_max_ps(v, y);
+        let max2 = _mm_max_ps(max1, z);
+        _mm_cvtss_f32(max2)
+    }
 }
 
 impl AABB {
