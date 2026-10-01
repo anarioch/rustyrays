@@ -1,5 +1,4 @@
 #![deny(bare_trait_objects)]
-#![feature(stdsimd)]
 
 extern crate rand;
 extern crate noise;

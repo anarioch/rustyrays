@@ -113,7 +113,7 @@ fn grid_scene() -> Vec<Box<raytrace::geometry::Hitable>> {
     for a in -7..7 {
         for b in -7..7 {
             let centre = raytrace::math::Vec3::new(a as f32, 0.0, b as f32);
-            objects.push(Box::new(raytrace::geometry::Sphere { centre, radius: 0.2, material: Box::new(raytrace::materials::Invisible {}) }));
+            objects.push(Box::new(raytrace::geometry::Sphere { centre, radius: 0.2, material: raytrace::materials::Material::Invisible }));
         }
     }
 

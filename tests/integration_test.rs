@@ -8,13 +8,13 @@ use raytrace::math::*;
 use raytrace::materials::*;
 use raytrace::geometry::*;
 
-fn grid_scene() -> Vec<Box<Hitable>> {
-    let mut objects : Vec<Box<Hitable>> = Vec::new();
+fn grid_scene() -> Vec<Box<dyn Hitable>> {
+    let mut objects : Vec<Box<dyn Hitable>> = Vec::new();
 
     for a in -7..7 {
         for b in -7..7 {
             let centre = Vec3::new(a as f32, 0.0, b as f32);
-            objects.push(Box::new(Sphere { centre, radius: 0.2, material: Box::new(Invisible {}) }));
+            objects.push(Box::new(Sphere { centre, radius: 0.2, material: Material::Invisible }));
         }
     }
 

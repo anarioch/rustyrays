@@ -557,7 +557,7 @@ pub fn hit<'a>(ray: &Ray, t_min: f32, t_max: f32, objects: &'a [Box<dyn Hitable>
 
 #[cfg(test)]
 mod tests {
-    use super::super::materials::Invisible;
+    use super::super::materials::Material;
     use super::*;
 
     #[test]
@@ -581,7 +581,7 @@ mod tests {
         let down_y = Ray { origin, direction: new_dir(0.0, -1.0, 0.0) };
         let down_y_parallel = Ray { origin: left, direction: new_dir(0.0, -1.0, 0.0) };
         // Expected hit: ray along y axis and sphere 2 units down y axis
-        let sphere = Sphere { centre: new_pos(0.0, -2.0, 0.0), radius: 1.0, material: Box::new(Invisible {}) };
+        let sphere = Sphere { centre: new_pos(0.0, -2.0, 0.0), radius: 1.0, material: Material::Invisible };
         match sphere.hit(&down_y, 0.0, 1000.0) {
             None => panic!("This ray and sphere were supposed to hit"),
             Some(record) => assert_eq!(record.t, 1.0),

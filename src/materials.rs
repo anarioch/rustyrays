@@ -48,7 +48,7 @@ pub struct NoiseTexture {
 
 impl NoiseTexture {
     pub fn new(scale: f32, colour: Vec3) -> NoiseTexture {
-        NoiseTexture { scale, colour, perlin: Perlin::new() }
+        NoiseTexture { scale, colour, perlin: Perlin::default() }
     }
 }
 
@@ -231,7 +231,8 @@ mod tests {
     #[test]
     fn scatter_metal() {
         // Given:
-        let material = Material::Metal { albedo: Vec3::new(1.0, 0.0, 0.0), fuzz: 0.0 };
+        let red = Vec3::new(1.0, 0.0, 0.0);
+        let material = Material::Metal { albedo: red, fuzz: 0.0 };
         let ray = Ray { origin: Vec3::new(-1.0, 2.0, 0.0), direction: Vec3::new(1.0, -1.0, 0.0) };
         let hit = HitRecord { t: 0.5, p: Vec3::new(0.0, 1.0, 1.0), normal: Vec3::new(0.0, 1.0, 0.0), material: &material };
 
@@ -242,7 +243,7 @@ mod tests {
         let res = res.unwrap();
 
         // Then: the attenuation is the red that we defined on the material
-        assert_eq!(res.attenuation, material.albedo);
+        assert_eq!(res.attenuation, red);
         assert_eq!(res.scattered.origin, hit.p);
         assert_eq!(res.scattered.direction, Vec3::new(1.0, 1.0, 0.0) * (1.0 / f32::sqrt(2.0)));
     }

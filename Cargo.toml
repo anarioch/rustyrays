@@ -14,7 +14,7 @@ lto = true
 [dependencies]
 
 rand = "0.8.0"
-noise = "0.7.0"
+noise = "0.9"
 float-cmp = "0.8.0"
 
 serde = { version = "1", features = ["derive"] }
